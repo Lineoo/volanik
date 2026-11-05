@@ -1,18 +1,18 @@
 use wgpu::*;
 
-use crate::{render::RenderPipelineOptions, shaders::Shaders};
+use crate::{camera::Scene, render::RenderCreationOptions, shaders::Shaders};
 
 pub struct Clouds {
     pipeline: RenderPipeline,
 }
 
 impl Clouds {
-    pub fn new(options: RenderPipelineOptions) -> Clouds {
+    pub fn new(options: RenderCreationOptions, camera: &BindGroupLayout) -> Clouds {
         let device = options.device;
 
         let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("clouds"),
-            bind_group_layouts: &[],
+            bind_group_layouts: &[Some(camera)],
             immediate_size: 0,
         });
 
@@ -50,8 +50,9 @@ impl Clouds {
         Clouds { pipeline }
     }
 
-    pub fn render(&self, rpass: &mut RenderPass<'_>) {
+    pub fn render(&self, rpass: &mut RenderPass<'_>, camera: &Scene) {
         rpass.set_pipeline(&self.pipeline);
+        rpass.set_bind_group(0, camera.group(), &[]);
         rpass.draw(0..3, 0..1);
     }
 }

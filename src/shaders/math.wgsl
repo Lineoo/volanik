@@ -1,3 +1,8 @@
+struct Scene {
+    view: mat4x4f,
+    time: f32,
+}
+
 fn hash12(p: vec2f) -> f32 {
     var p3 = fract(vec3f(p.x, p.y, p.x) * 0.1031);
     p3 = p3 + vec3f(dot(p3, vec3f(p3.y, p3.z, p3.x)) + 33.33);

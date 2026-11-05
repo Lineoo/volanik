@@ -1,13 +1,16 @@
 use std::sync::Arc;
 
+use glam::DVec2;
 use winit::{
     application::ApplicationHandler,
-    event::WindowEvent,
+    dpi::PhysicalPosition,
+    event::{ButtonSource, ElementState, MouseButton, PointerSource, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop},
+    keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowAttributes, WindowId},
 };
 
-use crate::{Volanik, clouds::Clouds, render::Render};
+use crate::{Volanik, render::Render};
 
 #[derive(Default)]
 pub struct MainEventLoop {
@@ -16,7 +19,23 @@ pub struct MainEventLoop {
 
 struct MainWindow {
     inner: Arc<dyn Window>,
+    drag: MouseDrag,
     main: Volanik,
+}
+
+#[derive(Default)]
+struct MouseDrag {
+    mouse_start: Option<PhysicalPosition<f64>>,
+}
+
+#[derive(Default)]
+pub struct Input {
+    pub w: bool,
+    pub a: bool,
+    pub s: bool,
+    pub d: bool,
+    pub r: bool,
+    pub f: bool,
 }
 
 impl MainEventLoop {
@@ -34,10 +53,10 @@ impl ApplicationHandler for MainEventLoop {
 
         let window = Arc::<dyn Window>::from(event_loop.create_window(attr).unwrap());
         let render = pollster::block_on(Render::new(window.clone(), window.surface_size()));
-        let clouds = Clouds::new(render.render_option());
         self.window = Some(MainWindow {
             inner: window,
-            main: Volanik { render, clouds },
+            drag: MouseDrag::default(),
+            main: Volanik::create(render),
         });
     }
 
@@ -57,11 +76,53 @@ impl ApplicationHandler for MainEventLoop {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
+                window.main.prepare();
                 window.main.render();
                 window.inner.request_redraw();
             }
             WindowEvent::SurfaceResized(size) => {
                 window.main.render.resize(size);
+            }
+            WindowEvent::PointerButton {
+                state,
+                position,
+                button: ButtonSource::Mouse(button),
+                ..
+            } => {
+                if button == MouseButton::Left {
+                    if state == ElementState::Pressed {
+                        window.drag.mouse_start = Some(position);
+                    } else if state == ElementState::Released {
+                        window.drag.mouse_start = None;
+                    }
+                }
+            }
+            WindowEvent::PointerMoved {
+                position,
+                source: PointerSource::Mouse,
+                ..
+            } => {
+                if let Some(start) = &mut window.drag.mouse_start {
+                    let delta = DVec2::new(position.x - start.x, position.y - start.y);
+                    window.main.camera.mouse_delta(delta);
+                    *start = position;
+                }
+            }
+            WindowEvent::KeyboardInput {
+                event,
+                is_synthetic: false,
+                ..
+            } => {
+                let pressed = event.state == ElementState::Pressed;
+                match event.physical_key {
+                    PhysicalKey::Code(KeyCode::KeyW) => window.main.input.w = pressed,
+                    PhysicalKey::Code(KeyCode::KeyA) => window.main.input.a = pressed,
+                    PhysicalKey::Code(KeyCode::KeyS) => window.main.input.s = pressed,
+                    PhysicalKey::Code(KeyCode::KeyD) => window.main.input.d = pressed,
+                    PhysicalKey::Code(KeyCode::KeyR) => window.main.input.r = pressed,
+                    PhysicalKey::Code(KeyCode::KeyF) => window.main.input.f = pressed,
+                    _ => (),
+                }
             }
             _ => {}
         }

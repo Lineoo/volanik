@@ -17,10 +17,23 @@ pub struct Render {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct RenderPipelineOptions<'r> {
+pub struct RenderCreationOptions<'r> {
     pub device: &'r Device,
     pub multisample: MultisampleState,
     pub format: TextureFormat,
+    pub update: RenderUpdateOptions<'r>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct RenderUpdateOptions<'r> {
+    pub queue: &'r Queue,
+    pub size: PhysicalSize<u32>,
+}
+
+impl RenderUpdateOptions<'_> {
+    pub fn aspect_ratio(&self) -> f32 {
+        self.size.width as f32 / self.size.height as f32
+    }
 }
 
 impl Render {
@@ -37,7 +50,7 @@ impl Render {
 
         let adapter = instance
             .request_adapter(&RequestAdapterOptions {
-                power_preference: PowerPreference::HighPerformance,
+                power_preference: PowerPreference::None,
                 force_fallback_adapter: false,
                 compatible_surface: Some(&surface),
                 apply_limit_buckets: false,
@@ -77,6 +90,7 @@ impl Render {
         }
     }
 
+    #[expect(unused)]
     pub fn recreate(&mut self, window: impl Into<SurfaceTarget<'static>>, size: PhysicalSize<u32>) {
         self.surface = self.instance.create_surface(window).unwrap();
         self.config = configuration(&self.surface, &self.adapter, size);
@@ -92,8 +106,8 @@ impl Render {
             .then(|| self.device.create_texture(&msaa_texture(&self.config)));
     }
 
-    pub fn render_option(&self) -> RenderPipelineOptions<'_> {
-        RenderPipelineOptions {
+    pub fn options_creation(&self) -> RenderCreationOptions<'_> {
+        RenderCreationOptions {
             device: &self.device,
             multisample: {
                 MultisampleState {
@@ -103,6 +117,14 @@ impl Render {
                 }
             },
             format: self.config.format,
+            update: self.options_update(),
+        }
+    }
+
+    pub fn options_update(&self) -> RenderUpdateOptions<'_> {
+        RenderUpdateOptions {
+            queue: &self.queue,
+            size: PhysicalSize::new(self.config.width, self.config.height),
         }
     }
 

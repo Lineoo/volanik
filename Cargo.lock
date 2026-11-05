@@ -515,6 +515,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "glam"
+version = "0.34.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54af5066834d6c2d404eb26ea036a15b15d9ff80db510b9a73ff95ab07f30831"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
 name = "glow"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1724,7 +1733,9 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "volanik"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "env_logger",
+ "glam",
  "log",
  "pollster",
  "wgpu",
