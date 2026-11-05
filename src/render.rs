@@ -134,9 +134,10 @@ impl Render {
                 label: Some("main_encoder"),
             });
 
-        let mut rpass = match msaa_view {
-            Some(msaa_view) => self.msaa_rpass(&msaa_view, &surface_view, &mut encoder),
-            None => self.plain_rpass(&surface_view, &mut encoder),
+        let mut rpass = if let Some(msaa_view) = msaa_view {
+            msaa_rpass(self.clear_color, &msaa_view, &surface_view, &mut encoder)
+        } else {
+            plain_rpass(self.clear_color, &surface_view, &mut encoder)
         };
 
         f(&mut rpass);
@@ -144,49 +145,6 @@ impl Render {
         drop(rpass);
         self.queue.submit([encoder.finish()]);
         self.queue.present(surface);
-    }
-
-    fn msaa_rpass<'encoder>(
-        &self,
-        msaa_view: &TextureView,
-        surface_view: &TextureView,
-        encoder: &'encoder mut CommandEncoder,
-    ) -> RenderPass<'encoder> {
-        encoder.begin_render_pass(&RenderPassDescriptor {
-            label: Some("main_rpass"),
-            color_attachments: &[Some(RenderPassColorAttachment {
-                view: &msaa_view,
-                resolve_target: Some(surface_view),
-                ops: Operations {
-                    load: LoadOp::Clear(self.clear_color),
-                    store: StoreOp::Discard,
-                },
-                depth_slice: None,
-            })],
-            timestamp_writes: None,
-            ..Default::default()
-        })
-    }
-
-    fn plain_rpass<'encoder>(
-        &self,
-        surface_view: &TextureView,
-        encoder: &'encoder mut CommandEncoder,
-    ) -> RenderPass<'encoder> {
-        encoder.begin_render_pass(&RenderPassDescriptor {
-            label: Some("main_rpass"),
-            color_attachments: &[Some(RenderPassColorAttachment {
-                view: surface_view,
-                resolve_target: None,
-                ops: Operations {
-                    load: LoadOp::Clear(self.clear_color),
-                    store: StoreOp::Store,
-                },
-                depth_slice: None,
-            })],
-            timestamp_writes: None,
-            ..Default::default()
-        })
     }
 }
 
@@ -233,6 +191,49 @@ fn configuration(
     log::debug!("alpha mode {:?}", config.alpha_mode);
 
     config
+}
+
+fn msaa_rpass<'encoder>(
+    clear_color: Color,
+    msaa_view: &TextureView,
+    surface_view: &TextureView,
+    encoder: &'encoder mut CommandEncoder,
+) -> RenderPass<'encoder> {
+    encoder.begin_render_pass(&RenderPassDescriptor {
+        label: Some("main_rpass"),
+        color_attachments: &[Some(RenderPassColorAttachment {
+            view: &msaa_view,
+            resolve_target: Some(surface_view),
+            ops: Operations {
+                load: LoadOp::Clear(clear_color),
+                store: StoreOp::Discard,
+            },
+            depth_slice: None,
+        })],
+        timestamp_writes: None,
+        ..Default::default()
+    })
+}
+
+fn plain_rpass<'encoder>(
+    clear_color: Color,
+    surface_view: &TextureView,
+    encoder: &'encoder mut CommandEncoder,
+) -> RenderPass<'encoder> {
+    encoder.begin_render_pass(&RenderPassDescriptor {
+        label: Some("main_rpass"),
+        color_attachments: &[Some(RenderPassColorAttachment {
+            view: surface_view,
+            resolve_target: None,
+            ops: Operations {
+                load: LoadOp::Clear(clear_color),
+                store: StoreOp::Store,
+            },
+            depth_slice: None,
+        })],
+        timestamp_writes: None,
+        ..Default::default()
+    })
 }
 
 fn msaa_texture(config: &SurfaceConfiguration) -> TextureDescriptor<'static> {

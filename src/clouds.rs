@@ -1,6 +1,6 @@
 use wgpu::*;
 
-use crate::render::RenderPipelineOptions;
+use crate::{render::RenderPipelineOptions, shaders::Shaders};
 
 pub struct Clouds {
     pipeline: RenderPipeline,
@@ -16,7 +16,10 @@ impl Clouds {
             immediate_size: 0,
         });
 
-        let shader = device.create_shader_module(include_wgsl!("shaders/clouds.wgsl"));
+        let shader = device.create_shader_module(ShaderModuleDescriptor {
+            label: Some("clouds"),
+            source: ShaderSource::Wgsl(Shaders::Clouds.source()),
+        });
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some("clouds"),

@@ -3,6 +3,7 @@
 mod clouds;
 mod render;
 mod window;
+mod shaders;
 
 fn main() {
     env_logger::init();

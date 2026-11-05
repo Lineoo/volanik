@@ -15,5 +15,5 @@ fn vs_main(@builtin(vertex_index) index: u32) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    return vec4f(in.uv, 0.0, 1.0);
+    return vec4f(vec3f(fbm4(in.uv * 100.0)), 1.0);
 }
