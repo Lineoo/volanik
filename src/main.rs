@@ -6,15 +6,15 @@ use glam::Vec3;
 
 use crate::{
     camera::{Camera, Scene, SceneData},
-    clouds::Clouds,
     render::Render,
+    skybox::Skybox,
     window::Input,
 };
 
 mod camera;
-mod clouds;
 mod render;
 mod shaders;
+mod skybox;
 mod window;
 
 fn main() {
@@ -28,7 +28,7 @@ fn main() {
 
 struct Volanik {
     render: Render,
-    clouds: Clouds,
+    clouds: Skybox,
     scene: Scene,
     camera: Camera,
     input: Input,
@@ -40,7 +40,7 @@ impl Volanik {
     fn create(render: Render) -> Self {
         let options = render.options_creation();
         let camera_layout = Scene::layout(options.device);
-        let clouds = Clouds::new(options, &camera_layout);
+        let clouds = Skybox::new(options, &camera_layout);
         let camera = Camera {
             translation: Vec3::new(0.0, 0.0, 0.0),
             yaw: 0.0,

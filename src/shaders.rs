@@ -1,16 +1,16 @@
 use std::borrow::Cow;
 
 pub enum Shaders {
-    Clouds,
+    Skybox,
 }
 
 impl Shaders {
     pub fn source(self) -> Cow<'static, str> {
         match self {
-            Shaders::Clouds => format!(
+            Shaders::Skybox => format!(
                 "{}\n{}",
                 include_str!("shaders/math.wgsl"),
-                include_str!("shaders/clouds.wgsl")
+                include_str!("shaders/skybox.wgsl")
             )
             .into(),
         }

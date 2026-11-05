@@ -2,27 +2,27 @@ use wgpu::*;
 
 use crate::{camera::Scene, render::RenderCreationOptions, shaders::Shaders};
 
-pub struct Clouds {
+pub struct Skybox {
     pipeline: RenderPipeline,
 }
 
-impl Clouds {
-    pub fn new(options: RenderCreationOptions, camera: &BindGroupLayout) -> Clouds {
+impl Skybox {
+    pub fn new(options: RenderCreationOptions, camera: &BindGroupLayout) -> Skybox {
         let device = options.device;
 
         let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            label: Some("clouds"),
+            label: Some("skybox"),
             bind_group_layouts: &[Some(camera)],
             immediate_size: 0,
         });
 
         let shader = device.create_shader_module(ShaderModuleDescriptor {
-            label: Some("clouds"),
-            source: ShaderSource::Wgsl(Shaders::Clouds.source()),
+            label: Some("skybox"),
+            source: ShaderSource::Wgsl(Shaders::Skybox.source()),
         });
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
-            label: Some("clouds"),
+            label: Some("skybox"),
             layout: Some(&layout),
             vertex: VertexState {
                 module: &shader,
@@ -47,7 +47,7 @@ impl Clouds {
             cache: None,
         });
 
-        Clouds { pipeline }
+        Skybox { pipeline }
     }
 
     pub fn render(&self, rpass: &mut RenderPass<'_>, camera: &Scene) {
