@@ -21,8 +21,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     // 3600x fast forward
     const DAY_CYCLE = 24 * 60 * 60 / 3600;
 
-    let pw_near = scene.view * vec4f(in.ndc, 0.0, 1.0);
-    let pw_far = scene.view * vec4f(in.ndc, 1.0, 1.0);
+    let pw_near = scene.world * scene.view * vec4f(in.ndc, 0.0, 1.0);
+    let pw_far = scene.world * scene.view * vec4f(in.ndc, 1.0, 1.0);
     let p_near = pw_near.xyz / pw_near.w;
     let p_far = pw_far.xyz / pw_far.w;
     let dir = normalize(p_far - p_near);
@@ -38,7 +38,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 // Rayleigh scatter
 fn fs_sky(p_near: vec3f, dir_view: vec3f, dir_sun: vec3f) -> vec4f {
     const ATMOS_RADIUS = 100e3;
-    const IRRADIATION_RATE = vec3f(2);
+    const IRRADIATION_RATE = vec3f(10);
     const BETA_RAY = vec3f(5.5e-6, 13.0e-6, 22.4e-6);
     const H_RAY = 8000;
     const MARCHING_STEPS = 16;
@@ -72,23 +72,39 @@ fn fs_sky(p_near: vec3f, dir_view: vec3f, dir_sun: vec3f) -> vec4f {
 fn fs_clouds(p: vec3f, dir: vec3f) -> vec4f {
     const CLOUD_LOW_HEIGHT = 2e3;
     const CLOUD_HIGH_HEIGHT = 5e3;
-    const MARCHING_STEPS = 32;
+    const MARCHING_STEPS = 8;
+    const SUB_STEPS = 8;
 
-    let s_low = spherical_intersect_dual(p, dir, CLOUD_LOW_HEIGHT);
-    let s_high = spherical_intersect_dual(p, dir, CLOUD_HIGH_HEIGHT);
-    let s_far = min(max(s_low.x, s_high.x), 1e5);
-    let s_near = max(min(s_low.x, s_high.x), 0);
+    let s_low = spherical_intersect_bi(p, dir, CLOUD_LOW_HEIGHT);
+    let s_high = spherical_intersect_bi(p, dir, CLOUD_HIGH_HEIGHT);
+    let s_near = max(select(s_high.x, s_low.y, s_low.x < 0.0), 0.0);
+    let s_far = min(select(s_high.y, s_low.x, s_low.x > 0.0 && s_low.x < s_high.y), 1e5);
+    let p_near = p + dir * s_near;
+
+    if s_high.y < 0 {
+        return vec4f();
+    }
 
     var sum = 0.0;
-    var s = 0.0;
-    let p_near = p + dir * s_near; 
+    let ds = min((s_far - s_near) / MARCHING_STEPS, 5e3);
+    let noise_f = vec3f(2e-4, 2e-4, 6e-4);
+    let noise_s = vec3f(0, scene.time * 1e-1, 0);
     for (var i = 0; i < MARCHING_STEPS; i++) {
-        let noise = fbm4_vnoise3((p_near + dir * s) * vec3f(6e-4, 6e-4, 3e-4) + vec3f(0, scene.time * 1e-1, 0));
-        let density = smoothstep(0.65, 0.75, noise);
-        let step = smoothstep(0.35, 0.75, noise);
-        let ds = min((s_far - s_near) / MARCHING_STEPS, 1e4 * exp(-4 * step));
-        sum += density * ds;
-        s += ds;
+        let p_first = p_near + dir * ds * f32(i);
+        let noise = fbm4_vnoise3(p_first * noise_f + noise_s)
+            * smoothstep(CLOUD_LOW_HEIGHT, CLOUD_LOW_HEIGHT + 2e2, p_first.z)
+            * smoothstep(CLOUD_HIGH_HEIGHT, CLOUD_HIGH_HEIGHT - 5e2, p_first.z);
+        if noise > 0.4 {
+            let ds_sub = ds / SUB_STEPS;
+            for (var j = 0; j < SUB_STEPS; j++) {
+                let p_sub = p_first + dir * ds_sub * f32(j);
+                let noise2 = fbm4_vnoise3(p_sub * noise_f + noise_s)
+                    * smoothstep(CLOUD_LOW_HEIGHT, CLOUD_LOW_HEIGHT + 2e2, p_sub.z)
+                    * smoothstep(CLOUD_HIGH_HEIGHT, CLOUD_HIGH_HEIGHT - 5e2, p_sub.z);
+                let density = smoothstep(0.6, 0.62, noise2);
+                sum += density * ds_sub;
+            } 
+        }
     }
 
     return vec4f(1 - exp(-1e-4 * sum));
@@ -103,12 +119,7 @@ fn fs_ground(p: vec3f, dir: vec3f) -> vec4f {
     return select(vec4f(), color, s > 0);
 }
 
-struct Intersect {
-    s: f32,
-    f: bool,
-}
-
-const PLANET_RADIUS = 6371e0;
+const PLANET_RADIUS = 6371e3;
 
 // r^2 = a^2 + b^2 - 2abcos
 // b^2 - (2acos) b + (a^2 - r^2) = 0
@@ -118,23 +129,17 @@ const PLANET_RADIUS = 6371e0;
 //
 // precise loss: PLANET_RADIUS (big)
 fn spherical_intersect(p: vec3f, d: vec3f, w: f32) -> f32 {
-    let a_cos = fma(PLANET_RADIUS, d.z, dot(p, d));
-    let c = fma(p.z - w, p.z + w + 2.0 * PLANET_RADIUS, dot(p.xy, p.xy));
-    let frac_d4 = fma(a_cos, a_cos, -c);
-    if (frac_d4 < 0.0) { return 0.0; }
-    let sq = sqrt(frac_d4);
-    let t0 = -a_cos - sq;
-    let t1 = -a_cos + sq;
-    return select(min(t0, t1), t1, t0 < 0);
+    let t = spherical_intersect_bi(p, d, w);
+    return select(min(t.x, t.y), t.y, t.x < 0);
 }
 
-fn spherical_intersect_dual(p: vec3f, d: vec3f, w: f32) -> vec2f {
+fn spherical_intersect_bi(p: vec3f, d: vec3f, w: f32) -> vec2f {
     let a_cos = fma(PLANET_RADIUS, d.z, dot(p, d));
     let c = fma(p.z - w, p.z + w + 2.0 * PLANET_RADIUS, dot(p.xy, p.xy));
     let frac_d4 = fma(a_cos, a_cos, -c);
-    if (frac_d4 < 0.0) { return 0.0; }
+    if (frac_d4 < 0) { return vec2f(); }
     let sq = sqrt(frac_d4);
     let t0 = -a_cos - sq;
     let t1 = -a_cos + sq;
-    return vec2f(select(min(t0, t1), t1, t0 < 0), select(max(t0, t1), t0, t0 < 0));
+    return vec2f(t0, t1);
 }

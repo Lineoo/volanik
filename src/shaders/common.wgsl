@@ -1,5 +1,6 @@
 struct Scene {
     view: mat4x4f,
+    world: mat4x4f,
     time: f32,
 }
 

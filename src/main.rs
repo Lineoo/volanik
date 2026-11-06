@@ -54,6 +54,7 @@ impl Volanik {
             &camera_layout,
             SceneData {
                 view: camera.view(options.update.aspect_ratio()),
+                world: camera.world(),
                 time: 0.0,
                 _pad: [0; 3],
             },
@@ -81,6 +82,7 @@ impl Volanik {
             options.queue,
             SceneData {
                 view: self.camera.view(options.aspect_ratio()),
+                world: self.camera.world(),
                 time: self.start.elapsed().as_secs_f32(),
                 _pad: [0; 3],
             },

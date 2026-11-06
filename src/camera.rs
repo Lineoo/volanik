@@ -17,8 +17,10 @@ pub struct Scene {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
 pub struct SceneData {
-    /// ndc -> world
+    /// ndc -> camera
     pub view: Mat4,
+    /// camera -> world
+    pub world: Mat4,
     pub time: f32,
     pub _pad: [u32; 3],
 }
@@ -35,8 +37,12 @@ pub struct Camera {
 impl Camera {
     /// ndc -> world
     pub fn view(&self, aspect: f32) -> Mat4 {
+        self.projection(aspect).inverse_or_zero()
+    }
+
+    /// ndc -> world
+    pub fn world(&self) -> Mat4 {
         Mat4::from_rotation_translation(self.rotation(), self.translation)
-            * self.projection(aspect).inverse_or_zero()
     }
 
     pub fn mouse_delta(&mut self, delta: DVec2) {
