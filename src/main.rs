@@ -42,6 +42,7 @@ impl Volanik {
         let camera_layout = Scene::layout(options.device);
         let clouds = Skybox::new(options, &camera_layout);
         let camera = Camera {
+            velocity: Vec3::ZERO,
             translation: Vec3::new(0.0, 0.0, 0.0),
             yaw: 0.0,
             pitch: 1.68,

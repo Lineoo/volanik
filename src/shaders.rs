@@ -9,7 +9,7 @@ impl Shaders {
         match self {
             Shaders::Skybox => format!(
                 "{}\n{}",
-                include_str!("shaders/math.wgsl"),
+                include_str!("shaders/common.wgsl"),
                 include_str!("shaders/skybox.wgsl")
             )
             .into(),

@@ -24,6 +24,7 @@ pub struct SceneData {
 }
 
 pub struct Camera {
+    pub velocity: Vec3,
     pub translation: Vec3,
     pub yaw: f32,
     pub pitch: f32,
@@ -51,8 +52,9 @@ impl Camera {
         dir.x -= scalar(input.a);
         dir.x += scalar(input.d);
         dir.y -= scalar(input.f);
-        dir.y += scalar(input.r);
-        self.translation += Mat3::from_quat(self.rotation_yaw()) * dir * 10.0 * dt.as_secs_f32();
+        dir.y += scalar(input.r); 
+        self.velocity = Mat3::from_quat(self.rotation_yaw()) * dir * 1000.0;
+        self.translation += self.velocity * dt.as_secs_f32();
     }
 
     fn projection(&self, aspect: f32) -> Mat4 {
