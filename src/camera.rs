@@ -58,7 +58,7 @@ impl Camera {
         dir.x -= scalar(input.a);
         dir.x += scalar(input.d);
         dir.y -= scalar(input.f);
-        dir.y += scalar(input.r); 
+        dir.y += scalar(input.r);
         self.velocity = Mat3::from_quat(self.rotation_yaw()) * dir * 1000.0;
         self.translation += self.velocity * dt.as_secs_f32();
     }

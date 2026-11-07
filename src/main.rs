@@ -67,14 +67,17 @@ impl Volanik {
             scene,
             camera,
             input,
-            time: Duration::from_hours(6),
+            time: Duration::from_hours(1),
             last: Instant::now(),
         }
     }
 
     fn prepare(&mut self) {
         let options = self.render.options_update();
-        let dt = self.last.elapsed();
+        let mut dt = self.last.elapsed();
+        if self.input.shift {
+            dt *= 100;
+        }
         self.camera.input(&self.input, dt);
         self.scene.write(
             options.queue,
@@ -85,7 +88,13 @@ impl Volanik {
                 _pad: [0; 3],
             },
         );
-        self.time += dt;
+        if self.input.x {
+            self.time = self.time.saturating_add(dt * 100);
+        }
+        if self.input.z {
+            self.time = self.time.saturating_sub(dt * 100);
+        }
+        self.time = self.time.saturating_add(dt);
         self.last = Instant::now();
     }
 

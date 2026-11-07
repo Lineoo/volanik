@@ -36,6 +36,9 @@ pub struct Input {
     pub d: bool,
     pub r: bool,
     pub f: bool,
+    pub z: bool,
+    pub x: bool,
+    pub shift: bool,
 }
 
 impl MainEventLoop {
@@ -121,6 +124,9 @@ impl ApplicationHandler for MainEventLoop {
                     PhysicalKey::Code(KeyCode::KeyD) => window.main.input.d = pressed,
                     PhysicalKey::Code(KeyCode::KeyR) => window.main.input.r = pressed,
                     PhysicalKey::Code(KeyCode::KeyF) => window.main.input.f = pressed,
+                    PhysicalKey::Code(KeyCode::KeyZ) => window.main.input.z = pressed,
+                    PhysicalKey::Code(KeyCode::KeyX) => window.main.input.x = pressed,
+                    PhysicalKey::Code(KeyCode::ShiftLeft) => window.main.input.shift = pressed,
                     _ => (),
                 }
             }
