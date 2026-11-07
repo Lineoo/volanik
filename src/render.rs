@@ -1,3 +1,5 @@
+use std::{cell::Cell, path::PathBuf};
+
 use wgpu::*;
 use winit::dpi::PhysicalSize;
 
@@ -7,6 +9,7 @@ pub struct Render {
     surface: Surface<'static>,
     config: SurfaceConfiguration,
     resolve: Option<Texture>,
+    export: Option<Export>,
 
     instance: Instance,
     adapter: Adapter,
@@ -28,6 +31,12 @@ pub struct RenderCreationOptions<'r> {
 pub struct RenderUpdateOptions<'r> {
     pub queue: &'r Queue,
     pub size: PhysicalSize<u32>,
+}
+
+struct Export {
+    path: PathBuf,
+    buffer: Buffer,
+    exported: Cell<bool>,
 }
 
 impl RenderUpdateOptions<'_> {
@@ -78,10 +87,17 @@ impl Render {
         let resolve =
             (MSAA_SAMPLE_COUNT > 1).then(|| device.create_texture(&msaa_texture(&config)));
 
+        let export = std::env::var_os("VOLANIK_EXPORT_PATH").map(|p| Export {
+            path: PathBuf::from(p),
+            buffer: device.create_buffer(&export_buffer(&config)),
+            exported: Cell::new(false),
+        });
+
         Render {
             surface,
             config,
             resolve,
+            export,
             instance,
             adapter,
             device,
@@ -95,15 +111,23 @@ impl Render {
         self.surface = self.instance.create_surface(window).unwrap();
         self.config = configuration(&self.surface, &self.adapter, size);
         self.surface.configure(&self.device, &self.config);
-        self.resolve = (MSAA_SAMPLE_COUNT > 1)
-            .then(|| self.device.create_texture(&msaa_texture(&self.config)));
+        if let Some(resolve) = &mut self.resolve {
+            *resolve = self.device.create_texture(&msaa_texture(&self.config));
+        }
+        if let Some(export) = &mut self.export {
+            export.buffer = self.device.create_buffer(&export_buffer(&self.config));
+        }
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
         self.config = configuration(&self.surface, &self.adapter, size);
         self.surface.configure(&self.device, &self.config);
-        self.resolve = (MSAA_SAMPLE_COUNT > 1)
-            .then(|| self.device.create_texture(&msaa_texture(&self.config)));
+        if let Some(resolve) = &mut self.resolve {
+            *resolve = self.device.create_texture(&msaa_texture(&self.config));
+        }
+        if let Some(export) = &mut self.export {
+            export.buffer = self.device.create_buffer(&export_buffer(&self.config));
+        }
     }
 
     pub fn options_creation(&self) -> RenderCreationOptions<'_> {
@@ -165,8 +189,92 @@ impl Render {
         f(&mut rpass);
 
         drop(rpass);
-        self.queue.submit([encoder.finish()]);
-        self.queue.present(surface);
+        if let Some(export) = &self.export {
+            export.export(&self.config, &surface.texture, &mut encoder);
+            self.queue.submit([encoder.finish()]);
+            self.queue.present(surface);
+            export.save(&self.config, &self.device);
+        } else {
+            self.queue.submit([encoder.finish()]);
+            self.queue.present(surface);
+        }
+    }
+}
+
+impl Export {
+    fn export(
+        &self,
+        config: &SurfaceConfiguration,
+        surface: &Texture,
+        encoder: &mut CommandEncoder,
+    ) {
+        if self.exported.get() {
+            return;
+        }
+
+        let (bytes_per_row, rows_per_image) = export_extend(config);
+        encoder.copy_texture_to_buffer(
+            TexelCopyTextureInfo {
+                texture: surface,
+                mip_level: 0,
+                origin: Origin3d::ZERO,
+                aspect: TextureAspect::All,
+            },
+            TexelCopyBufferInfo {
+                buffer: &self.buffer,
+                layout: TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(bytes_per_row),
+                    rows_per_image: Some(rows_per_image),
+                },
+            },
+            Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
+            },
+        );
+    }
+
+    fn save(&self, config: &SurfaceConfiguration, device: &Device) {
+        if self.exported.get() {
+            return;
+        }
+
+        let (row, col) = export_extend(config);
+        let (row_png, col_png) = (config.width * 4, config.height);
+        let (row, _col) = (row as usize, col as usize);
+        let (row_png, col_png) = (row_png as usize, col_png as usize);
+
+        let slice = self.buffer.slice(..);
+        let (tx, rx) = std::sync::mpsc::channel();
+        slice.map_async(MapMode::Read, move |result| tx.send(result).unwrap());
+        device.poll(PollType::wait_indefinitely()).unwrap();
+        rx.recv().unwrap().unwrap();
+
+        let data = slice.get_mapped_range().unwrap();
+        let mut pixels = Vec::with_capacity(row_png * col_png);
+        for line in data.chunks(row) {
+            pixels.extend_from_slice(&line[..row_png]);
+        }
+        drop(data);
+        self.buffer.unmap();
+
+        if let Some(parent) = self.path.parent().filter(|parent| !parent.is_empty()) {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+
+        let file = std::fs::File::create(&self.path).unwrap();
+        let mut encoder =
+            png::Encoder::new(std::io::BufWriter::new(file), config.width, config.height);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header().unwrap();
+        writer.write_image_data(&pixels).unwrap();
+        writer.finish().unwrap();
+
+        log::info!("exported frame to {}", self.path.display());
+        self.exported.set(true);
     }
 }
 
@@ -177,7 +285,7 @@ fn configuration(
 ) -> SurfaceConfiguration {
     let caps = surface.get_capabilities(&adapter);
     let config = SurfaceConfiguration {
-        usage: TextureUsages::RENDER_ATTACHMENT,
+        usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::COPY_SRC,
         format: (caps.formats.iter().copied())
             .max_by_key(|format| match format {
                 TextureFormat::Rgba8UnormSrgb => 100,
@@ -277,4 +385,21 @@ fn msaa_texture(config: &SurfaceConfiguration) -> TextureDescriptor<'static> {
         usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TRANSIENT_ATTACHMENT,
         view_formats: &[],
     }
+}
+
+fn export_buffer(config: &SurfaceConfiguration) -> BufferDescriptor<'static> {
+    let (bytes_per_row, rows_per_image) = export_extend(config);
+    BufferDescriptor {
+        label: Some("export_readback"),
+        size: (bytes_per_row as u64) * (rows_per_image as u64),
+        usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    }
+}
+
+fn export_extend(config: &SurfaceConfiguration) -> (u32, u32) {
+    let bytes_per_row =
+        (config.width * 4).div_ceil(COPY_BYTES_PER_ROW_ALIGNMENT) * COPY_BYTES_PER_ROW_ALIGNMENT;
+    let rows_per_image = config.height;
+    (bytes_per_row, rows_per_image)
 }

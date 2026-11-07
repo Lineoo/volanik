@@ -1,6 +1,6 @@
 #![windows_subsystem = "windows"]
 
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use glam::Vec3;
 
@@ -32,7 +32,7 @@ struct Volanik {
     scene: Scene,
     camera: Camera,
     input: Input,
-    start: Instant,
+    time: Duration,
     last: Instant,
 }
 
@@ -61,16 +61,14 @@ impl Volanik {
         );
         let input = Input::default();
 
-        let now = Instant::now();
-
         Self {
             render,
             clouds,
             scene,
             camera,
             input,
-            start: now,
-            last: now,
+            time: Duration::from_hours(6),
+            last: Instant::now(),
         }
     }
 
@@ -83,10 +81,11 @@ impl Volanik {
             SceneData {
                 view: self.camera.view(options.aspect_ratio()),
                 world: self.camera.world(),
-                time: self.start.elapsed().as_secs_f32(),
+                time: self.time.as_secs_f32(),
                 _pad: [0; 3],
             },
         );
+        self.time += dt;
         self.last = Instant::now();
     }
 

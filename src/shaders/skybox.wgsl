@@ -18,14 +18,21 @@ fn vs_main(@builtin(vertex_index) index: u32) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    // 3600x fast forward
-    const DAY_CYCLE = 24 * 60 * 60 / 3600;
+    const DAY_CYCLE = 24 * 60 * 60;
 
-    let pw_near = scene.world * scene.view * vec4f(in.ndc, 0.0, 1.0);
-    let pw_far = scene.world * scene.view * vec4f(in.ndc, 1.0, 1.0);
-    let p_near = pw_near.xyz / pw_near.w;
-    let p_far = pw_far.xyz / pw_far.w;
-    let dir = normalize(p_far - p_near);
+    let rot_world = mat3x3f(
+        scene.world[0].xyz,
+        scene.world[1].xyz,
+        scene.world[2].xyz
+    );
+
+    let pv_far = scene.view * vec4f(in.ndc, 1.0, 1.0);
+    let pv_near = scene.view * vec4f(in.ndc, 0.0, 1.0);
+    let pw_far = pv_far / pv_far.w;
+    let pw_near = pv_near / pv_near.w;
+    let p_far = (scene.world * pw_far).xyz;
+    let p_near = (scene.world * pw_near).xyz;
+    let dir = normalize((rot_world * (pw_far - pw_near).xyz));
 
     let rad_sun = scene.time / DAY_CYCLE * TAU;
 
@@ -72,8 +79,8 @@ fn fs_sky(p_near: vec3f, dir_view: vec3f, dir_sun: vec3f) -> vec4f {
 fn fs_clouds(p: vec3f, dir: vec3f) -> vec4f {
     const CLOUD_LOW_HEIGHT = 2e3;
     const CLOUD_HIGH_HEIGHT = 5e3;
-    const MARCHING_STEPS = 8;
-    const SUB_STEPS = 8;
+    const MARCHING_STEPS = 4;
+    const SUB_STEPS = 4;
 
     let s_low = spherical_intersect_bi(p, dir, CLOUD_LOW_HEIGHT);
     let s_high = spherical_intersect_bi(p, dir, CLOUD_HIGH_HEIGHT);
@@ -88,16 +95,16 @@ fn fs_clouds(p: vec3f, dir: vec3f) -> vec4f {
     var sum = 0.0;
     let ds = min((s_far - s_near) / MARCHING_STEPS, 5e3);
     let noise_f = vec3f(2e-4, 2e-4, 6e-4);
-    let noise_s = vec3f(0, scene.time * 1e-1, 0);
+    let noise_s = vec3f(0, scene.time * 1e-3, 0);
     for (var i = 0; i < MARCHING_STEPS; i++) {
-        let p_first = p_near + dir * ds * f32(i);
+        let p_first = p_near + dir * ds * f32(i) + dir * ds * (hash14(vec4f(dir * 23.24, f32(i) * 21.5)) - 0.5);
         let noise = fbm4_vnoise3(p_first * noise_f + noise_s)
             * smoothstep(CLOUD_LOW_HEIGHT, CLOUD_LOW_HEIGHT + 2e2, p_first.z)
             * smoothstep(CLOUD_HIGH_HEIGHT, CLOUD_HIGH_HEIGHT - 5e2, p_first.z);
         if noise > 0.4 {
             let ds_sub = ds / SUB_STEPS;
             for (var j = 0; j < SUB_STEPS; j++) {
-                let p_sub = p_first + dir * ds_sub * f32(j);
+                let p_sub = p_first + dir * ds_sub * f32(j) + dir * ds_sub * (hash14(vec4f(dir * 23.24, f32(j) * 21.5)) - 0.5);
                 let noise2 = fbm4_vnoise3(p_sub * noise_f + noise_s)
                     * smoothstep(CLOUD_LOW_HEIGHT, CLOUD_LOW_HEIGHT + 2e2, p_sub.z)
                     * smoothstep(CLOUD_HIGH_HEIGHT, CLOUD_HIGH_HEIGHT - 5e2, p_sub.z);
@@ -107,7 +114,7 @@ fn fs_clouds(p: vec3f, dir: vec3f) -> vec4f {
         }
     }
 
-    return vec4f(1 - exp(-1e-4 * sum));
+    return vec4f(1 - exp(-5e-4 * sum));
 }
 
 fn fs_ground(p: vec3f, dir: vec3f) -> vec4f {
