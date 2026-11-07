@@ -1,17 +1,17 @@
 #![windows_subsystem = "windows"]
 
-use std::time::{Duration, Instant};
-
-use glam::Vec3;
+use std::time::Instant;
 
 use crate::{
-    camera::{Camera, Scene, SceneData},
+    camera::{Control, Scene},
+    overlay::Overlay,
     render::Render,
     skybox::Skybox,
     window::Input,
 };
 
 mod camera;
+mod overlay;
 mod render;
 mod shaders;
 mod skybox;
@@ -30,34 +30,23 @@ struct Volanik {
     render: Render,
     clouds: Skybox,
     scene: Scene,
-    camera: Camera,
+    control: Control,
     input: Input,
-    time: Duration,
+    overlay: Overlay,
     last: Instant,
 }
 
 impl Volanik {
-    fn create(render: Render) -> Self {
+    fn create(render: Render, pixels_per_point: f32) -> Self {
         let options = render.options_creation();
         let camera_layout = Scene::layout(options.device);
         let clouds = Skybox::new(options, &camera_layout);
-        let camera = Camera {
-            velocity: Vec3::ZERO,
-            translation: Vec3::new(0.0, 0.0, 0.0),
-            yaw: 0.0,
-            pitch: 1.68,
-            roll: 0.0,
-            fov: 1.8,
-        };
+        let overlay = Overlay::new(options.device, options.format, pixels_per_point);
+        let control = Control::default();
         let scene = Scene::new(
             options.device,
             &camera_layout,
-            SceneData {
-                view: camera.view(options.update.aspect_ratio()),
-                world: camera.world(),
-                time: 0.0,
-                _pad: [0; 3],
-            },
+            control.data(options.update.aspect_ratio()),
         );
         let input = Input::default();
 
@@ -65,42 +54,33 @@ impl Volanik {
             render,
             clouds,
             scene,
-            camera,
+            control,
             input,
-            time: Duration::from_hours(1),
+            overlay,
             last: Instant::now(),
         }
     }
 
     fn prepare(&mut self) {
         let options = self.render.options_update();
-        let mut dt = self.last.elapsed();
-        if self.input.shift {
-            dt *= 100;
+        let dt = self.last.elapsed();
+
+        match self.overlay.wants_keyboard() {
+            true => self.control.input(&Input::default(), dt),
+            false => self.control.input(&self.input, dt),
         }
-        self.camera.input(&self.input, dt);
-        self.scene.write(
-            options.queue,
-            SceneData {
-                view: self.camera.view(options.aspect_ratio()),
-                world: self.camera.world(),
-                time: self.time.as_secs_f32(),
-                _pad: [0; 3],
-            },
-        );
-        if self.input.x {
-            self.time = self.time.saturating_add(dt * 100);
-        }
-        if self.input.z {
-            self.time = self.time.saturating_sub(dt * 100);
-        }
-        self.time = self.time.saturating_add(dt);
+
+        self.overlay.frame(options.size, &mut self.control);
+
+        self.scene
+            .write(options.queue, self.control.data(options.aspect_ratio()));
+
         self.last = Instant::now();
     }
 
-    fn render(&self) {
-        self.render.render(|rpass| {
-            self.clouds.render(rpass, &self.scene);
+    fn draw(&mut self) {
+        self.render.render(&mut self.overlay, |rpass| {
+            self.clouds.draw(rpass, &self.scene);
         });
     }
 }

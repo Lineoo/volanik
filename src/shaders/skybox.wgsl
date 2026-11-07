@@ -48,8 +48,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 const PLANET_RADIUS = 6371e3;
 const H_RAY = 8000;
 const ATMOS_RADIUS = 100e3;
-// const BETA_RAY = vec3f(5.5e-6, 13.0e-6, 22.4e-6);
-const BETA_RAY = vec3f(5.5e-6, 24.0e-6, 22.4e-6);
+const BETA_RAY = vec3f(5.5e-6, 13.0e-6, 22.4e-6);
+// const BETA_RAY = vec3f(5.5e-6, 24.0e-6, 22.4e-6);
 const IRRADIATION_RATE = vec3f(20);
 
 const CLOUD_THRESHOLD = -0.0;

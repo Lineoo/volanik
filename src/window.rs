@@ -56,10 +56,11 @@ impl ApplicationHandler for MainEventLoop {
 
         let window = Arc::<dyn Window>::from(event_loop.create_window(attr).unwrap());
         let render = pollster::block_on(Render::new(window.clone(), window.surface_size()));
+        let pixels_per_point = window.scale_factor() as f32;
         self.window = Some(MainWindow {
             inner: window,
             drag: MouseDrag::default(),
-            main: Volanik::create(render),
+            main: Volanik::create(render, pixels_per_point),
         });
     }
 
@@ -73,6 +74,8 @@ impl ApplicationHandler for MainEventLoop {
             return;
         };
 
+        window.main.overlay.on_window_event(&event);
+
         match event {
             WindowEvent::CloseRequested => {
                 self.window = None;
@@ -80,7 +83,7 @@ impl ApplicationHandler for MainEventLoop {
             }
             WindowEvent::RedrawRequested => {
                 window.main.prepare();
-                window.main.render();
+                window.main.draw();
                 window.inner.request_redraw();
             }
             WindowEvent::SurfaceResized(size) => {
@@ -94,7 +97,9 @@ impl ApplicationHandler for MainEventLoop {
             } => {
                 if button == MouseButton::Left {
                     if state == ElementState::Pressed {
-                        window.drag.mouse_start = Some(position);
+                        if !window.main.overlay.wants_pointer() {
+                            window.drag.mouse_start = Some(position);
+                        }
                     } else if state == ElementState::Released {
                         window.drag.mouse_start = None;
                     }
@@ -107,9 +112,12 @@ impl ApplicationHandler for MainEventLoop {
             } => {
                 if let Some(start) = &mut window.drag.mouse_start {
                     let delta = DVec2::new(position.x - start.x, position.y - start.y);
-                    window.main.camera.mouse_delta(delta);
+                    window.main.control.mouse_delta(delta);
                     *start = position;
                 }
+            }
+            WindowEvent::PointerLeft { .. } => {
+                window.drag.mouse_start = None;
             }
             WindowEvent::KeyboardInput {
                 event,
@@ -127,6 +135,9 @@ impl ApplicationHandler for MainEventLoop {
                     PhysicalKey::Code(KeyCode::KeyZ) => window.main.input.z = pressed,
                     PhysicalKey::Code(KeyCode::KeyX) => window.main.input.x = pressed,
                     PhysicalKey::Code(KeyCode::ShiftLeft) => window.main.input.shift = pressed,
+                    PhysicalKey::Code(KeyCode::F1) if pressed => {
+                        window.main.overlay.toggle_visible();
+                    }
                     _ => (),
                 }
             }

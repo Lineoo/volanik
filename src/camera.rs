@@ -25,16 +25,50 @@ pub struct SceneData {
     pub _pad: [u32; 3],
 }
 
-pub struct Camera {
+pub struct Control {
     pub velocity: Vec3,
     pub translation: Vec3,
     pub yaw: f32,
     pub pitch: f32,
     pub roll: f32,
     pub fov: f32,
+    pub speed: f32,
+    pub time: Duration,
+    pub time_paused: bool,
+    pub time_scale: f32,
 }
 
-impl Camera {
+impl Default for Control {
+    fn default() -> Self {
+        Self {
+            velocity: Vec3::ZERO,
+            translation: Vec3::ZERO,
+            yaw: 0.0,
+            pitch: 1.68,
+            roll: 0.0,
+            fov: 1.8,
+            speed: 1000.0,
+            time: Duration::ZERO,
+            time_paused: false,
+            time_scale: 1.0,
+        }
+    }
+}
+
+impl Control {
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    pub fn data(&self, aspect: f32) -> SceneData {
+        SceneData {
+            view: self.view(aspect),
+            world: self.world(),
+            time: self.time.as_secs_f32(),
+            _pad: [0; 3],
+        }
+    }
+
     /// ndc -> world
     pub fn view(&self, aspect: f32) -> Mat4 {
         self.projection(aspect).inverse_or_zero()
@@ -59,8 +93,20 @@ impl Camera {
         dir.x += scalar(input.d);
         dir.y -= scalar(input.f);
         dir.y += scalar(input.r);
-        self.velocity = Mat3::from_quat(self.rotation_yaw()) * dir * 1000.0;
+
+        self.velocity = Mat3::from_quat(self.rotation_yaw()) * dir * self.speed;
         self.translation += self.velocity * dt.as_secs_f32();
+
+        if input.x {
+            self.time = self.time.saturating_add(dt * 100);
+        }
+        if input.z {
+            self.time = self.time.saturating_sub(dt * 100);
+        }
+        if !self.time_paused {
+            let scaled = dt.mul_f32(self.time_scale);
+            self.time = self.time.saturating_add(scaled);
+        }
     }
 
     fn projection(&self, aspect: f32) -> Mat4 {
@@ -68,11 +114,11 @@ impl Camera {
     }
 
     fn rotation(&self) -> Quat {
-        Quat::from_euler(EulerRot::ZXY, self.yaw, self.pitch, self.roll)
+        Quat::from_euler(EulerRot::ZXZ, self.yaw, self.pitch, self.roll)
     }
 
     fn rotation_yaw(&self) -> Quat {
-        Quat::from_euler(EulerRot::ZXY, self.yaw, FRAC_PI_2, 0.0)
+        Quat::from_euler(EulerRot::ZXZ, self.yaw, FRAC_PI_2, 0.0)
     }
 }
 

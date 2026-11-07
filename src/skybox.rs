@@ -50,7 +50,7 @@ impl Skybox {
         Skybox { pipeline }
     }
 
-    pub fn render(&self, rpass: &mut RenderPass<'_>, camera: &Scene) {
+    pub fn draw(&self, rpass: &mut RenderPass<'_>, camera: &Scene) {
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, camera.group(), &[]);
         rpass.draw(0..3, 0..1);

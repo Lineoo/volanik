@@ -7,11 +7,12 @@
 - `render` - GPU 资源管理
 - `camera` - 场景绑定和相机控制
 - `skybox` - 体积云和天空盒
+- `debug` - egui 调试面板
 - `shaders` 着色器
 
 # 操作 #
 
-WASD 前后左右 RF 上升下降 ZX 时间控制 Shift 加速
+WASD 前后左右 RF 上升下降 ZX 时间控制 Shift 加速 F1 显示/隐藏调试面板
 
 # 坐标系 & 常量 #
 

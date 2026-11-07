@@ -3,7 +3,10 @@ use std::{cell::Cell, path::PathBuf};
 use wgpu::*;
 use winit::dpi::PhysicalSize;
 
+use crate::overlay::Overlay;
+
 const MSAA_SAMPLE_COUNT: u32 = 1;
+const EXPORT_SETTLE_FRAMES: u32 = 3;
 
 pub struct Render {
     surface: Surface<'static>,
@@ -37,6 +40,7 @@ struct Export {
     path: PathBuf,
     buffer: Buffer,
     exported: Cell<bool>,
+    frames: Cell<u32>,
 }
 
 impl RenderUpdateOptions<'_> {
@@ -91,6 +95,7 @@ impl Render {
             path: PathBuf::from(p),
             buffer: device.create_buffer(&export_buffer(&config)),
             exported: Cell::new(false),
+            frames: Cell::new(0),
         });
 
         Render {
@@ -152,7 +157,7 @@ impl Render {
         }
     }
 
-    pub fn render(&self, f: impl FnOnce(&mut RenderPass)) {
+    pub fn render(&self, overlay: &mut Overlay, f: impl FnOnce(&mut RenderPass<'static>)) {
         let surface = match self.surface.get_current_texture() {
             CurrentSurfaceTexture::Success(surface_texture) => surface_texture,
             CurrentSurfaceTexture::Suboptimal(surface_texture) => surface_texture,
@@ -180,16 +185,34 @@ impl Render {
                 label: Some("main_encoder"),
             });
 
-        let mut rpass = if let Some(msaa_view) = msaa_view {
+        if overlay.has_content() {
+            overlay.prepare(&self.device, &self.queue, &mut encoder);
+        }
+
+        let rpass = if let Some(msaa_view) = msaa_view {
             msaa_rpass(self.clear_color, &msaa_view, &surface_view, &mut encoder)
         } else {
             plain_rpass(self.clear_color, &surface_view, &mut encoder)
         };
 
+        let mut rpass = rpass.forget_lifetime();
+
         f(&mut rpass);
 
+        if overlay.has_content() {
+            overlay.draw(&mut rpass);
+            overlay.finish();
+        }
+
         drop(rpass);
-        if let Some(export) = &self.export {
+
+        let export_now = self
+            .export
+            .as_ref()
+            .is_some_and(|export| export.should_export());
+        if let Some(export) = &self.export
+            && export_now
+        {
             export.export(&self.config, &surface.texture, &mut encoder);
             self.queue.submit([encoder.finish()]);
             self.queue.present(surface);
@@ -202,6 +225,15 @@ impl Render {
 }
 
 impl Export {
+    fn should_export(&self) -> bool {
+        if self.exported.get() {
+            return false;
+        }
+        let frames = self.frames.get() + 1;
+        self.frames.set(frames);
+        frames >= EXPORT_SETTLE_FRAMES
+    }
+
     fn export(
         &self,
         config: &SurfaceConfiguration,
