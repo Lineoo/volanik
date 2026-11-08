@@ -104,6 +104,12 @@ fn hash44(p_in: vec4f) -> vec4f {
     return fract((p4.xxyz + p4.yzzw) * p4.zywx);
 }
 
+// 4D Checker Texture
+fn checker4(p: vec4f) -> f32 {
+    let i = vec4i(floor(p));
+    return f32((i.x + i.y + i.z + i.w) & 1);
+}
+
 // 2D Value Noise (Cubic Interpolate)
 fn vnoise2(p: vec2f) -> f32 {
     let i = floor(p);

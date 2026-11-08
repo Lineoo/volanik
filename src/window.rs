@@ -3,7 +3,7 @@ use std::sync::Arc;
 use glam::DVec2;
 use winit::{
     application::ApplicationHandler,
-    dpi::PhysicalPosition,
+    dpi::{PhysicalPosition, PhysicalSize},
     event::{ButtonSource, ElementState, MouseButton, PointerSource, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
@@ -52,6 +52,7 @@ impl ApplicationHandler for MainEventLoop {
     fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
         let attr = WindowAttributes::default()
             .with_transparent(true)
+            .with_surface_size(PhysicalSize::new(1600, 900))
             .with_title("Volanik");
 
         let window = Arc::<dyn Window>::from(event_loop.create_window(attr).unwrap());
