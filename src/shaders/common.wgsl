@@ -4,6 +4,7 @@ struct Scene {
     time: f32,
 }
 
+const E                 : f32 = 2.71828182845904523536028747135266250;
 const PI                : f32 = 3.14159265358979323846264338327950288;
 const TAU               : f32 = 6.28318530717958647692528676655900577;
 const FRAC_1_SQRT_PI    : f32 = 0.564189583547756286948079451560772586;
@@ -390,6 +391,26 @@ fn pnoise4_grad(p: vec4f) -> vec4f {
     );
 
     return vec4f(gx, gy, gz, gw);
+}
+
+// 3D Worley noise First Point Distance
+fn worley3_f1(p: vec3f) -> f32 {
+    let cell  = floor(p);
+    let local = fract(p);
+
+    var minDist = 1e9;
+
+    for (var z = -1; z <= 1; z++) {
+        for (var y = -1; y <= 1; y++) {
+            for (var x = -1; x <= 1; x++) {
+                let g = vec3f(f32(x), f32(y), f32(z));
+                let o = hash33(cell + g);
+                let r = g + o - local;
+                minDist = min(minDist, dot(r, r));
+            }
+        }
+    }
+    return sqrt(minDist);
 }
 
 // 4-step Fractal Brownian Motion with 4D Perlin Noise
