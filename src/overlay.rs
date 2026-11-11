@@ -23,7 +23,11 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
 };
 
-use crate::{camera::Control, render::Render, skybox::Skybox};
+use crate::{
+    camera::{Clouds, Control},
+    render::Render,
+    skybox::Skybox,
+};
 
 const DAY_SECONDS: f64 = 24.0 * 60.0 * 60.0;
 const TARGET_FRAME_SECONDS: f32 = 1.0 / 60.0;
@@ -331,7 +335,7 @@ impl Overlay {
             egui::Window::new("Volanik")
                 .open(&mut open)
                 .default_pos([12.0, 12.0])
-                .default_size([320.0, 430.0])
+                .default_size([340.0, 640.0])
                 .resizable(true)
                 .vscroll(true)
                 .show(ui.ctx(), |ui| {
@@ -436,6 +440,11 @@ fn overlay_ui(
         .show(ui, |ui| {
             time_ui(ui, control);
         });
+
+    ui.separator();
+    egui::CollapsingHeader::new("云")
+        .default_open(true)
+        .show(ui, |ui| clouds_ui(ui, &mut control.clouds));
 
     ui.separator();
     ui.horizontal(|ui| {
@@ -580,6 +589,52 @@ fn time_ui(ui: &mut Ui, control: &mut Control) {
         );
     });
     ui.small("Z / X 手动拨动时间 · Shift 加速");
+}
+
+fn clouds_ui(ui: &mut Ui, clouds: &mut Clouds) {
+    ui.spacing_mut().slider_width = 150.0;
+    ui.add(
+        Slider::new(&mut clouds.coverage, 0.0..=1.0)
+            .text("覆盖")
+            .fixed_decimals(2),
+    );
+    ui.add(
+        Slider::new(&mut clouds.density, 0.1..=3.0)
+            .text("密度")
+            .fixed_decimals(2),
+    );
+    ui.horizontal(|ui| {
+        ui.label("云底");
+        ui.add(
+            DragValue::new(&mut clouds.base)
+                .speed(50.0)
+                .range(500.0..=5000.0)
+                .suffix(" m"),
+        );
+        ui.label("云顶");
+        ui.add(
+            DragValue::new(&mut clouds.top)
+                .speed(50.0)
+                .range(3000.0..=12000.0)
+                .suffix(" m"),
+        );
+    });
+    if clouds.top < clouds.base + 500.0 {
+        ui.colored_label(Color32::from_rgb(235, 200, 110), "云顶至少比云底高 500 m");
+    }
+    ui.add(
+        Slider::new(&mut clouds.wind, 0.0..=60.0)
+            .text("风速")
+            .suffix(" m/s"),
+    );
+    ui.add(
+        Slider::new(&mut clouds.quality, 0.0..=1.0)
+            .text("质量")
+            .fixed_decimals(2),
+    );
+    let view_steps = 24 + (clouds.quality * 56.0) as u32;
+    let light_steps = 4 + (clouds.quality * 4.0) as u32;
+    ui.small(format!("{view_steps} 步 · {light_steps} 光照步"));
 }
 
 fn format_time(seconds: f64) -> String {

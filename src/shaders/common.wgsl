@@ -2,6 +2,13 @@ struct Scene {
     view: mat4x4f,
     world: mat4x4f,
     time: f32,
+    cloud_coverage: f32,
+    cloud_density: f32,
+    cloud_wind: f32,
+    cloud_quality: f32,
+    cloud_base: f32,
+    cloud_top: f32,
+    pad: u32,
 }
 
 const E                 : f32 = 2.71828182845904523536028747135266250;

@@ -292,6 +292,16 @@ impl Export {
         drop(data);
         self.buffer.unmap();
 
+        // The surface is usually BGRA, but the PNG writer expects RGBA.
+        if matches!(
+            config.format,
+            TextureFormat::Bgra8Unorm | TextureFormat::Bgra8UnormSrgb
+        ) {
+            for pixel in pixels.chunks_exact_mut(4) {
+                pixel.swap(0, 2);
+            }
+        }
+
         if let Some(parent) = self.path.parent().filter(|parent| !parent.is_empty()) {
             std::fs::create_dir_all(parent).unwrap();
         }
@@ -307,6 +317,10 @@ impl Export {
 
         log::info!("exported frame to {}", self.path.display());
         self.exported.set(true);
+
+        if std::env::var_os("VOLANIK_EXPORT_EXIT").is_some() {
+            std::process::exit(0);
+        }
     }
 }
 
