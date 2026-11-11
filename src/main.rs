@@ -28,7 +28,7 @@ fn main() {
 
 struct Volanik {
     render: Render,
-    clouds: Skybox,
+    skybox: Skybox,
     scene: Scene,
     control: Control,
     input: Input,
@@ -40,7 +40,7 @@ impl Volanik {
     fn create(render: Render, pixels_per_point: f32) -> Self {
         let options = render.options_creation();
         let camera_layout = Scene::layout(options.device);
-        let clouds = Skybox::new(options, &camera_layout);
+        let skybox = Skybox::new(options, &camera_layout);
         let overlay = Overlay::new(options.device, options.format, pixels_per_point);
         let control = Control::default();
         let scene = Scene::new(
@@ -52,7 +52,7 @@ impl Volanik {
 
         Self {
             render,
-            clouds,
+            skybox,
             scene,
             control,
             input,
@@ -62,7 +62,6 @@ impl Volanik {
     }
 
     fn prepare(&mut self) {
-        let options = self.render.options_update();
         let dt = self.last.elapsed();
 
         match self.overlay.wants_keyboard() {
@@ -70,8 +69,13 @@ impl Volanik {
             false => self.control.input(&self.input, dt),
         }
 
-        self.overlay.frame(options.size, &mut self.control);
+        self.overlay.frame(
+            &mut self.control,
+            &mut self.skybox,
+            &mut self.render,
+        );
 
+        let options = self.render.options_update();
         self.scene
             .write(options.queue, self.control.data(options.aspect_ratio()));
 
@@ -80,7 +84,7 @@ impl Volanik {
 
     fn draw(&mut self) {
         self.render.render(&mut self.overlay, |rpass| {
-            self.clouds.draw(rpass, &self.scene);
+            self.skybox.draw(rpass, &self.scene);
         });
     }
 }

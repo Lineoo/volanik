@@ -10,12 +10,12 @@ use std::{
 use egui::{
     Color32, Context, DragValue, Event, FontData, FontDefinitions, FontFamily, Key, Modifiers,
     MouseWheelSource, MouseWheelUnit, PointerButton, Pos2, RawInput, Rect, RichText, Slider,
-    TouchPhase, Vec2, ViewportId,
+    TouchPhase, Ui, Vec2, ViewportId,
 };
 use egui_wgpu::{Renderer, RendererOptions, ScreenDescriptor};
 use wgpu::{CommandEncoder, Device, Queue, RenderPass, TextureFormat};
 use winit::{
-    dpi::{PhysicalPosition, PhysicalSize},
+    dpi::PhysicalPosition,
     event::{
         ElementState, KeyEvent, MouseButton, MouseScrollDelta, ScrollSource,
         TouchPhase as WinitTouchPhase, WindowEvent,
@@ -23,7 +23,7 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
 };
 
-use crate::camera::Control;
+use crate::{camera::Control, render::Render, skybox::Skybox};
 
 const DAY_SECONDS: f64 = 24.0 * 60.0 * 60.0;
 const TARGET_FRAME_SECONDS: f32 = 1.0 / 60.0;
@@ -291,14 +291,15 @@ impl Overlay {
         }
     }
 
-    pub fn frame(&mut self, size: PhysicalSize<u32>, control: &mut Control) {
+    pub fn frame(&mut self, control: &mut Control, skybox: &mut Skybox, render: &mut Render) {
         self.tick();
 
         if !self.visible {
             return;
         }
 
-        let size = [size.width.max(1), size.height.max(1)];
+        let options = render.options_update();
+        let size = [options.size.width.max(1), options.size.height.max(1)];
         let native_ppp = self.native_pixels_per_point;
         let ppp = self.pixels_per_point;
         self.screen = ScreenDescriptor {
@@ -327,14 +328,14 @@ impl Overlay {
         };
 
         let output = self.context.run_ui(input, |ui| {
-            egui::Window::new("Volanik · 调试")
+            egui::Window::new("Volanik")
                 .open(&mut open)
                 .default_pos([12.0, 12.0])
                 .default_size([320.0, 430.0])
                 .resizable(true)
                 .vscroll(true)
                 .show(ui.ctx(), |ui| {
-                    overlay_ui(ui, control, panel_info);
+                    overlay_ui(ui, control, skybox, render, panel_info);
                 });
         });
 
@@ -391,7 +392,13 @@ struct PanelInfo {
     pixels_per_point: f32,
 }
 
-fn overlay_ui(ui: &mut egui::Ui, control: &mut Control, info: PanelInfo) {
+fn overlay_ui(
+    ui: &mut Ui,
+    control: &mut Control,
+    skybox: &mut Skybox,
+    render: &mut Render,
+    info: PanelInfo,
+) {
     let stats = info.stats;
     ui.horizontal(|ui| {
         let fps_color = if stats.fps >= 55.0 {
@@ -436,13 +443,17 @@ fn overlay_ui(ui: &mut egui::Ui, control: &mut Control, info: PanelInfo) {
             control.reset();
         }
         if ui.button("隐藏 (F1)").clicked() {
-            ui.close();
-        };
+            ui.close_kind(egui::UiKind::Window);
+        }
+        if ui.button("重载").clicked() {
+            let options = render.options_creation();
+            skybox.reload(options);
+        }
     });
     ui.small("F1 显示/隐藏面板 · 拖拽鼠标旋转视角");
 }
 
-fn camera_ui(ui: &mut egui::Ui, camera: &mut Control) {
+fn camera_ui(ui: &mut Ui, camera: &mut Control) {
     egui::Grid::new("camera_position")
         .num_columns(2)
         .spacing([8.0, 4.0])
@@ -543,7 +554,7 @@ fn camera_ui(ui: &mut egui::Ui, camera: &mut Control) {
     });
 }
 
-fn time_ui(ui: &mut egui::Ui, control: &mut Control) {
+fn time_ui(ui: &mut Ui, control: &mut Control) {
     let mut seconds = control.time.as_secs_f64() % DAY_SECONDS;
     ui.horizontal(|ui| {
         ui.label("时刻");
