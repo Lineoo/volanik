@@ -1,10 +1,22 @@
 use wgpu::*;
 
-use crate::{scene::Scene, render::RenderCreationOptions, shaders::Shaders};
+use crate::{render::RenderCreationOptions, scene::Scene, shaders::Shaders};
 
 pub struct Skybox {
     layout: PipelineLayout,
     pipeline: RenderPipeline,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
+pub struct CloudsUniform {
+    pub density: f32,
+    pub step: i32,
+    pub dist: f32,
+    pub scatter: f32,
+    pub absorb: f32,
+    pub ior: f32,
+    pub _pad: [u32; 2],
 }
 
 impl Skybox {
@@ -105,7 +117,7 @@ impl Skybox {
 
     pub fn draw(&self, rpass: &mut RenderPass<'_>, camera: &Scene) {
         rpass.set_pipeline(&self.pipeline);
-        rpass.set_bind_group(0, camera.group(), &[]);
+        rpass.set_bind_group(0, &camera.group, &[]);
         rpass.draw(0..3, 0..1);
     }
 }

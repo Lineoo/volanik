@@ -3,7 +3,17 @@ struct VertexOutput {
     @location(0) ndc: vec2f,
 }
 
+struct Clouds {
+    density: f32,
+    step: i32,
+    dist: f32,
+    scatter: f32,
+    absorb: f32,
+    ior: f32,
+}
+
 @group(0) @binding(0) var<uniform> scene: Scene;
+@group(0) @binding(1) var<uniform> clouds: Clouds;
 
 @vertex
 fn vs_main(@builtin(vertex_index) index: u32) -> VertexOutput {
@@ -46,7 +56,7 @@ fn fs_clouds(p: vec3f, dir: vec3f, dir_sun: vec3f) -> vec4f {
     const MARCHING_STEPS = 8;
     const LIGHT_STEPS = 4;
         
-    let sun_phase = henyey_greenstein(-dot(dir, dir_sun), -0.6);
+    let sun_phase = henyey_greenstein(-dot(dir, dir_sun), clouds.ior);
 
     var color = vec3f();
     var dens = 0.0;
@@ -54,9 +64,9 @@ fn fs_clouds(p: vec3f, dir: vec3f, dir_sun: vec3f) -> vec4f {
     let s_high = spherical_intersect_bi(p, dir, 10000);
     var s = max(select(s_high.x, s_low.y, s_low.x < 0.0), 0.0);
     if s > 300e3 { return vec4f(); }
-    for (var i = 0; i < MARCHING_STEPS; i++) {
+    for (var i = 0; i < clouds.step; i++) {
         let p_cloud = p + dir * s;
-        let ds = 1e3 * (hash14(vec4f(dir * 23.24, f32(i) * 21.5)) * 2);
+        let ds = clouds.dist * (hash14(vec4f(dir * 23.24, f32(i) * 21.5)) * 2);
         // * hash14(vec4f(dir * 23.24, f32(i) * 21.5)) * 2;
         let density = cloud_density(p_cloud);
 
@@ -70,16 +80,16 @@ fn fs_clouds(p: vec3f, dir: vec3f, dir_sun: vec3f) -> vec4f {
             s_sun += ds_sun;
         }
 
-        let irradiation_in = sun_phase * IRRADIATION_RATE * exp(-(CLOUD_ABSORB + CLOUD_SCATTER) * dens_sun);
-        let transmission = exp(-(CLOUD_ABSORB + CLOUD_SCATTER) * dens);
+        let irradiation_in = sun_phase * IRRADIATION_RATE * exp(-(clouds.absorb + clouds.scatter) * dens_sun);
+        let transmission = exp(-(clouds.absorb + clouds.scatter) * dens);
 
-        color += irradiation_in * transmission * CLOUD_SCATTER * density * ds;
+        color += irradiation_in * transmission * clouds.scatter * density * ds;
         dens += density * ds;
         s += ds;
     }
 
-    let transmission = exp(-(CLOUD_ABSORB + CLOUD_SCATTER) * dens);
-    let a = 1 - (transmission.x + transmission.y + transmission.z) / 3.;
+    let transmission = exp(-(clouds.absorb + clouds.scatter) * dens);
+    let a = 1 - transmission;
     return vec4f(color, a);
 }
 
@@ -188,9 +198,6 @@ fn atmos_density(p: vec3f) -> f32 {
 
 // Clouds //
 
-const CLOUD_SCATTER = vec3f(15e-3);
-const CLOUD_ABSORB = vec3f();
-
 // c: cos(t), g: IOR
 fn henyey_greenstein(c: f32, g: f32) -> f32 {
     let g2 = g * g;
@@ -200,5 +207,5 @@ fn henyey_greenstein(c: f32, g: f32) -> f32 {
 fn cloud_density(p: vec3f) -> f32 {
     let height = spherical_height(p);
     let mask = smoothstep(5000, 6000, height) * smoothstep(10000, 9000, height);
-    return step(0.5, fbm4_vnoise3(p * 0.7e-3)) * mask;
+    return step(0.5, fbm4_vnoise3(p * 0.7e-3) * mask) * clouds.density;
 }

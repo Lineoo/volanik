@@ -34,6 +34,8 @@ pub struct Input {
     pub a: bool,
     pub s: bool,
     pub d: bool,
+    pub q: bool,
+    pub e: bool,
     pub r: bool,
     pub f: bool,
     pub z: bool,
@@ -131,6 +133,8 @@ impl ApplicationHandler for MainEventLoop {
                     PhysicalKey::Code(KeyCode::KeyA) => window.main.input.a = pressed,
                     PhysicalKey::Code(KeyCode::KeyS) => window.main.input.s = pressed,
                     PhysicalKey::Code(KeyCode::KeyD) => window.main.input.d = pressed,
+                    PhysicalKey::Code(KeyCode::KeyQ) => window.main.input.q = pressed,
+                    PhysicalKey::Code(KeyCode::KeyE) => window.main.input.e = pressed,
                     PhysicalKey::Code(KeyCode::KeyR) => window.main.input.r = pressed,
                     PhysicalKey::Code(KeyCode::KeyF) => window.main.input.f = pressed,
                     PhysicalKey::Code(KeyCode::KeyZ) => window.main.input.z = pressed,
@@ -138,6 +142,10 @@ impl ApplicationHandler for MainEventLoop {
                     PhysicalKey::Code(KeyCode::ShiftLeft) => window.main.input.shift = pressed,
                     PhysicalKey::Code(KeyCode::F1) if pressed => {
                         window.main.overlay.toggle_visible();
+                    }
+                    PhysicalKey::Code(KeyCode::F5) if pressed => {
+                        let options = window.main.render.options_creation();
+                        window.main.skybox.reload(options);
                     }
                     _ => (),
                 }

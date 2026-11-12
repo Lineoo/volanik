@@ -2,13 +2,18 @@ use std::{f32::consts::FRAC_PI_2, time::Duration};
 
 use glam::{DVec2, EulerRot, Mat3, Mat4, Quat, Vec3};
 
-use crate::{scene::SceneData, window::Input};
+use crate::{
+    scene::{SceneGroup, SceneUniform},
+    skybox::CloudsUniform,
+    window::Input,
+};
 
 #[derive(Default)]
 pub struct Control {
     pub character: Character,
     pub camera: Camera,
     pub cycle: Cycle,
+    pub clouds: Clouds,
 }
 
 pub struct Character {
@@ -27,6 +32,15 @@ pub struct Cycle {
     pub time: Duration,
     pub time_paused: bool,
     pub time_scale: f32,
+}
+
+pub struct Clouds {
+    pub density: f32,
+    pub step: i32,
+    pub length: f32,
+    pub scatter: f32,
+    pub absorb: f32,
+    pub ior: f32,
 }
 
 impl Default for Character {
@@ -53,6 +67,19 @@ impl Default for Cycle {
             time: Duration::ZERO,
             time_paused: false,
             time_scale: 1.0,
+        }
+    }
+}
+
+impl Default for Clouds {
+    fn default() -> Self {
+        Self {
+            density: 1.0,
+            step: 4,
+            length: 4e3,
+            scatter: 15e-3,
+            absorb: 0.0,
+            ior: -0.6
         }
     }
 }
@@ -86,12 +113,23 @@ impl Control {
         *self = Self::default();
     }
 
-    pub fn scene(&self, aspect: f32) -> SceneData {
-        SceneData {
-            view: self.camera.view(aspect),
-            world: self.camera.world(),
-            time: self.cycle.time.as_secs_f32(),
-            _pad: [0; 3],
+    pub fn scene(&self, aspect: f32) -> SceneGroup {
+        SceneGroup {
+            scene: SceneUniform {
+                view: self.camera.view(aspect),
+                world: self.camera.world(),
+                time: self.cycle.time.as_secs_f32(),
+                _pad: [0; 3],
+            },
+            clouds: CloudsUniform {
+                density: self.clouds.density,
+                step: self.clouds.step,
+                dist: self.clouds.length / self.clouds.step as f32,
+                scatter: self.clouds.scatter,
+                absorb: self.clouds.absorb,
+                ior: self.clouds.ior,
+                _pad: [0; 2],
+            },
         }
     }
 

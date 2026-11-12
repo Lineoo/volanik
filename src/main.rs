@@ -35,17 +35,13 @@ struct Volanik {
 
 impl Volanik {
     fn create(render: Render, pixels_per_point: f32) -> Self {
+        let control = Control::default();
+        let input = Input::default();
+
         let options = render.options_creation();
         let scene_layout = Scene::layout(options.device);
         let skybox = Skybox::new(options, &scene_layout);
-        let control = Control::default();
-        let scene = Scene::new(
-            options.device,
-            &scene_layout,
-            control.scene(options.update.aspect_ratio()),
-        );
-
-        let input = Input::default();
+        let scene = Scene::new(options.device, &scene_layout);
         let overlay = Overlay::new(options.device, options.format, pixels_per_point);
 
         Self {
@@ -67,11 +63,15 @@ impl Volanik {
             false => self.control.input(&self.input, dt),
         }
 
-        self.overlay.frame(&mut self.control, &mut self.skybox, &mut self.render);
+        self.overlay
+            .frame(&mut self.control, &mut self.skybox, &mut self.render);
 
-        let options = self.render.options_update();
-        self.scene
-            .write(options.queue, self.control.scene(options.aspect_ratio()));
+        let options = self.render.options_creation();
+        self.scene.write(
+            options.device,
+            options.update.queue,
+            &self.control.scene(options.update.aspect_ratio()),
+        );
 
         self.last = Instant::now();
     }

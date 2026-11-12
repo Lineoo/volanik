@@ -17,7 +17,7 @@ use winit::{
 };
 
 use crate::{
-    control::{Camera, Character, Control, Cycle},
+    control::{Camera, Character, Clouds, Control, Cycle},
     render::Render,
     skybox::Skybox,
 };
@@ -428,6 +428,13 @@ fn overlay_ui(
         .show(ui, |ui| camera_ui(ui, &mut control.camera));
 
     ui.separator();
+    CollapsingHeader::new("操控")
+        .default_open(true)
+        .show(ui, |ui| {
+            character_ui(ui, &mut control.character);
+        });
+
+    ui.separator();
     CollapsingHeader::new("时间")
         .default_open(true)
         .show(ui, |ui| {
@@ -435,26 +442,25 @@ fn overlay_ui(
         });
 
     ui.separator();
-    CollapsingHeader::new("天空盒")
+    CollapsingHeader::new("体积云")
         .default_open(true)
         .show(ui, |ui| {
-            character_ui(ui, &mut control.character);
+            clouds_ui(ui, &mut control.clouds);
         });
 
     ui.separator();
     ui.horizontal(|ui| {
-        if ui.button("重置相机").clicked() {
+        if ui.button("重置").clicked() {
             control.reset();
         }
         if ui.button("隐藏 (F1)").clicked() {
             ui.close_kind(UiKind::Window);
         }
-        if ui.button("重载").clicked() {
+        if ui.button("重载 (F5)").clicked() {
             let options = render.options_creation();
             skybox.reload(options);
         }
     });
-    ui.small("F1 显示/隐藏面板 · 拖拽鼠标旋转视角");
 }
 
 fn camera_ui(ui: &mut Ui, camera: &mut Camera) {
@@ -586,6 +592,45 @@ fn cycle_ui(ui: &mut Ui, cycle: &mut Cycle) {
         );
     });
     ui.small("Z / X 手动拨动时间");
+}
+
+fn clouds_ui(ui: &mut Ui, clouds: &mut Clouds) {
+    ui.horizontal(|ui| {
+        ui.label("密度");
+        ui.add(
+            DragValue::new(&mut clouds.density)
+                .speed(0.01)
+                .range(1.0..=3.0),
+        );
+        ui.label("步数");
+        ui.add(DragValue::new(&mut clouds.step).speed(0.1).range(4..=64));
+        ui.label("距离");
+        ui.add(
+            DragValue::new(&mut clouds.length)
+                .speed(0.1e3)
+                .range(0.1e3..=100e3),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.label("散射");
+        ui.add(
+            DragValue::new(&mut clouds.scatter)
+                .speed(1e-3)
+                .range(0e-3..=100e-3),
+        );
+        ui.label("吸收");
+        ui.add(
+            DragValue::new(&mut clouds.absorb)
+                .speed(1e-3)
+                .range(0e-3..=100e-3),
+        );
+        ui.label("IOR");
+        ui.add(
+            DragValue::new(&mut clouds.ior)
+                .speed(0.05)
+                .range(-1.0..=1.0),
+        );
+    });
 }
 
 // utils //
