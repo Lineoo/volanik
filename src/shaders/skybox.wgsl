@@ -15,7 +15,6 @@ fn vs_main(@builtin(vertex_index) index: u32) -> VertexOutput {
     return ret;
 }
 
-
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     const DAY_CYCLE = 24 * 60 * 60;
@@ -51,13 +50,13 @@ fn fs_clouds(p: vec3f, dir: vec3f, dir_sun: vec3f) -> vec4f {
 
     var color = vec3f();
     var dens = 0.0;
-    let s_low = spherical_intersect_bi(p, dir, 2000);
+    let s_low = spherical_intersect_bi(p, dir, 4000);
     let s_high = spherical_intersect_bi(p, dir, 10000);
     var s = max(select(s_high.x, s_low.y, s_low.x < 0.0), 0.0);
     if s > 300e3 { return vec4f(); }
     for (var i = 0; i < MARCHING_STEPS; i++) {
         let p_cloud = p + dir * s;
-        let ds = 1e3 * (hash14(vec4f(dir * 23.24, f32(i) * 21.5)) * 0.5 + 0.75);
+        let ds = 1e3 * (hash14(vec4f(dir * 23.24, f32(i) * 21.5)) * 2);
         // * hash14(vec4f(dir * 23.24, f32(i) * 21.5)) * 2;
         let density = cloud_density(p_cloud);
 

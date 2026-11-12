@@ -7,23 +7,20 @@ use std::{
     time::{Duration, Instant},
 };
 
-use egui::{
-    Color32, Context, DragValue, Event, FontData, FontDefinitions, FontFamily, Key, Modifiers,
-    MouseWheelSource, MouseWheelUnit, PointerButton, Pos2, RawInput, Rect, RichText, Slider,
-    TouchPhase, Ui, Vec2, ViewportId,
-};
+use egui::*;
 use egui_wgpu::{Renderer, RendererOptions, ScreenDescriptor};
 use wgpu::{CommandEncoder, Device, Queue, RenderPass, TextureFormat};
 use winit::{
     dpi::PhysicalPosition,
-    event::{
-        ElementState, KeyEvent, MouseButton, MouseScrollDelta, ScrollSource,
-        TouchPhase as WinitTouchPhase, WindowEvent,
-    },
+    event::{ElementState, KeyEvent, MouseScrollDelta, ScrollSource, WindowEvent},
     keyboard::{KeyCode, PhysicalKey},
 };
 
-use crate::{camera::Control, render::Render, skybox::Skybox};
+use crate::{
+    control::{Camera, Character, Control, Cycle},
+    render::Render,
+    skybox::Skybox,
+};
 
 const DAY_SECONDS: f64 = 24.0 * 60.0 * 60.0;
 const TARGET_FRAME_SECONDS: f32 = 1.0 / 60.0;
@@ -47,9 +44,9 @@ pub struct Overlay {
     context: Context,
     renderer: Renderer,
     raw_input: RawInput,
-    paint_jobs: Vec<egui::ClippedPrimitive>,
-    textures_delta: egui::TexturesDelta,
-    free_textures: Vec<egui::TextureId>,
+    paint_jobs: Vec<ClippedPrimitive>,
+    textures_delta: TexturesDelta,
+    free_textures: Vec<TextureId>,
 
     screen: ScreenDescriptor,
     native_pixels_per_point: f32,
@@ -68,7 +65,7 @@ impl Overlay {
     pub fn new(device: &Device, format: TextureFormat, pixels_per_point: f32) -> Self {
         let context = Context::default();
         install_fonts(&context);
-        context.set_visuals(egui::Visuals::dark());
+        context.set_visuals(Visuals::dark());
 
         let renderer = Renderer::new(device, format, RendererOptions::default());
         let raw_input = fresh_raw_input(pixels_per_point);
@@ -78,7 +75,7 @@ impl Overlay {
             renderer,
             raw_input,
             paint_jobs: Vec::new(),
-            textures_delta: egui::TexturesDelta::default(),
+            textures_delta: TexturesDelta::default(),
             free_textures: Vec::new(),
             screen: ScreenDescriptor {
                 size_in_pixels: [1, 1],
@@ -168,7 +165,7 @@ impl Overlay {
                 button,
                 ..
             } => {
-                if let Some(button) = button.clone().mouse_button().and_then(pointer_button) {
+                if let Some(button) = button.clone().mouse_button().and_then(egui_pointer_button) {
                     self.raw_input.events.push(Event::PointerButton {
                         pos: self.to_points(*position),
                         button,
@@ -328,7 +325,7 @@ impl Overlay {
         };
 
         let output = self.context.run_ui(input, |ui| {
-            egui::Window::new("Volanik")
+            Window::new("Volanik")
                 .open(&mut open)
                 .default_pos([12.0, 12.0])
                 .default_size([340.0, 640.0])
@@ -341,7 +338,7 @@ impl Overlay {
 
         self.visible = open;
 
-        let egui::FullOutput {
+        let FullOutput {
             textures_delta,
             shapes,
             pixels_per_point,
@@ -426,15 +423,22 @@ fn overlay_ui(
     );
 
     ui.separator();
-    egui::CollapsingHeader::new("相机")
+    CollapsingHeader::new("相机")
         .default_open(true)
-        .show(ui, |ui| camera_ui(ui, control));
+        .show(ui, |ui| camera_ui(ui, &mut control.camera));
 
     ui.separator();
-    egui::CollapsingHeader::new("时间")
+    CollapsingHeader::new("时间")
         .default_open(true)
         .show(ui, |ui| {
-            time_ui(ui, control);
+            cycle_ui(ui, &mut control.cycle);
+        });
+
+    ui.separator();
+    CollapsingHeader::new("天空盒")
+        .default_open(true)
+        .show(ui, |ui| {
+            character_ui(ui, &mut control.character);
         });
 
     ui.separator();
@@ -443,7 +447,7 @@ fn overlay_ui(
             control.reset();
         }
         if ui.button("隐藏 (F1)").clicked() {
-            ui.close_kind(egui::UiKind::Window);
+            ui.close_kind(UiKind::Window);
         }
         if ui.button("重载").clicked() {
             let options = render.options_creation();
@@ -453,8 +457,8 @@ fn overlay_ui(
     ui.small("F1 显示/隐藏面板 · 拖拽鼠标旋转视角");
 }
 
-fn camera_ui(ui: &mut Ui, camera: &mut Control) {
-    egui::Grid::new("camera_position")
+fn camera_ui(ui: &mut Ui, camera: &mut Camera) {
+    Grid::new("camera_position")
         .num_columns(2)
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
@@ -542,11 +546,13 @@ fn camera_ui(ui: &mut Ui, camera: &mut Control) {
             camera.fov = fov.to_radians();
         }
     });
+}
 
+fn character_ui(ui: &mut Ui, character: &mut Character) {
     ui.horizontal(|ui| {
         ui.label("速度");
         ui.add(
-            DragValue::new(&mut camera.speed)
+            DragValue::new(&mut character.speed)
                 .speed(10.0)
                 .range(1.0..=100_000.0)
                 .suffix(" m/s"),
@@ -554,8 +560,8 @@ fn camera_ui(ui: &mut Ui, camera: &mut Control) {
     });
 }
 
-fn time_ui(ui: &mut Ui, control: &mut Control) {
-    let mut seconds = control.time.as_secs_f64() % DAY_SECONDS;
+fn cycle_ui(ui: &mut Ui, cycle: &mut Cycle) {
+    let mut seconds = cycle.time.as_secs_f64() % DAY_SECONDS;
     ui.horizontal(|ui| {
         ui.label("时刻");
         ui.monospace(format_time(seconds));
@@ -565,15 +571,15 @@ fn time_ui(ui: &mut Ui, control: &mut Control) {
         .add(Slider::new(&mut seconds, 0.0..=DAY_SECONDS).show_value(false))
         .changed()
     {
-        control.time = Duration::from_secs_f64(seconds);
+        cycle.time = Duration::from_secs_f64(seconds);
     }
 
     ui.horizontal(|ui| {
-        ui.checkbox(&mut control.time_paused, "冻结时间");
+        ui.checkbox(&mut cycle.time_paused, "冻结时间");
         ui.separator();
         ui.label("倍率");
         ui.add(
-            DragValue::new(&mut control.time_scale)
+            DragValue::new(&mut cycle.time_scale)
                 .speed(0.1)
                 .range(0.1..=10.0)
                 .suffix("×"),
@@ -648,28 +654,30 @@ fn egui_modifiers(modifiers: &winit::event::Modifiers) -> Modifiers {
     }
 }
 
-fn pointer_button(button: MouseButton) -> Option<PointerButton> {
+fn egui_pointer_button(button: winit::event::MouseButton) -> Option<PointerButton> {
+    use winit::event::MouseButton::*;
     Some(match button {
-        MouseButton::Left => PointerButton::Primary,
-        MouseButton::Right => PointerButton::Secondary,
-        MouseButton::Middle => PointerButton::Middle,
-        MouseButton::Back => PointerButton::Extra1,
-        MouseButton::Forward => PointerButton::Extra2,
+        Left => PointerButton::Primary,
+        Right => PointerButton::Secondary,
+        Middle => PointerButton::Middle,
+        Back => PointerButton::Extra1,
+        Forward => PointerButton::Extra2,
         _ => return None,
     })
 }
 
-fn egui_touch_phase(phase: WinitTouchPhase) -> TouchPhase {
+fn egui_touch_phase(phase: winit::event::TouchPhase) -> TouchPhase {
+    use winit::event::TouchPhase::*;
     match phase {
-        WinitTouchPhase::Started => TouchPhase::Start,
-        WinitTouchPhase::Moved => TouchPhase::Move,
-        WinitTouchPhase::Ended => TouchPhase::End,
-        WinitTouchPhase::Cancelled => TouchPhase::Cancel,
+        Started => TouchPhase::Start,
+        Moved => TouchPhase::Move,
+        Ended => TouchPhase::End,
+        Cancelled => TouchPhase::Cancel,
     }
 }
 
-fn egui_key(code: KeyCode) -> Option<Key> {
-    use KeyCode::*;
+fn egui_key(code: winit::keyboard::KeyCode) -> Option<Key> {
+    use winit::keyboard::KeyCode::*;
     Some(match code {
         Backquote => Key::Backtick,
         Backslash => Key::Backslash,

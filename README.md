@@ -5,8 +5,9 @@
 - `main` - 程序入口
 - `window` - winit 窗口管理和输入管理
 - `render` - GPU 资源管理
-- `camera` - 场景绑定和相机控制
-- `skybox` - 体积云和天空盒
+    - `scene` - 场景绑定
+    - `skybox` - 天空盒绑定
+- `control` - 场景参数控制
 - `overlay` - egui 调试面板
 - `shaders` 着色器拼接与热重载
 

@@ -3,16 +3,13 @@
 use std::time::Instant;
 
 use crate::{
-    camera::{Control, Scene},
-    overlay::Overlay,
-    render::Render,
-    skybox::Skybox,
-    window::Input,
+    control::Control, overlay::Overlay, render::Render, scene::Scene, skybox::Skybox, window::Input,
 };
 
-mod camera;
+mod control;
 mod overlay;
 mod render;
+mod scene;
 mod shaders;
 mod skybox;
 mod window;
@@ -39,16 +36,17 @@ struct Volanik {
 impl Volanik {
     fn create(render: Render, pixels_per_point: f32) -> Self {
         let options = render.options_creation();
-        let camera_layout = Scene::layout(options.device);
-        let skybox = Skybox::new(options, &camera_layout);
-        let overlay = Overlay::new(options.device, options.format, pixels_per_point);
+        let scene_layout = Scene::layout(options.device);
+        let skybox = Skybox::new(options, &scene_layout);
         let control = Control::default();
         let scene = Scene::new(
             options.device,
-            &camera_layout,
-            control.data(options.update.aspect_ratio()),
+            &scene_layout,
+            control.scene(options.update.aspect_ratio()),
         );
+
         let input = Input::default();
+        let overlay = Overlay::new(options.device, options.format, pixels_per_point);
 
         Self {
             render,
@@ -69,12 +67,11 @@ impl Volanik {
             false => self.control.input(&self.input, dt),
         }
 
-        self.overlay
-            .frame(&mut self.control, &mut self.skybox, &mut self.render);
+        self.overlay.frame(&mut self.control, &mut self.skybox, &mut self.render);
 
         let options = self.render.options_update();
         self.scene
-            .write(options.queue, self.control.data(options.aspect_ratio()));
+            .write(options.queue, self.control.scene(options.aspect_ratio()));
 
         self.last = Instant::now();
     }

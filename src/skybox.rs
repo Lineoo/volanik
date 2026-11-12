@@ -1,6 +1,6 @@
 use wgpu::*;
 
-use crate::{camera::Scene, render::RenderCreationOptions, shaders::Shaders};
+use crate::{scene::Scene, render::RenderCreationOptions, shaders::Shaders};
 
 pub struct Skybox {
     layout: PipelineLayout,
@@ -98,6 +98,7 @@ impl Skybox {
         if let Some(errors) = pollster::block_on(errors.pop()) {
             log::warn!("{errors}");
         } else {
+            log::debug!("skybox reload");
             self.pipeline = pipeline;
         }
     }
