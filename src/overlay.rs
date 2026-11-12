@@ -17,9 +17,9 @@ use winit::{
 };
 
 use crate::{
-    control::{Camera, Character, Clouds, Control, Cycle},
+    control::{Camera, Character, Control, Cycle},
     render::Render,
-    skybox::Skybox,
+    skybox::{CloudsUniform, Skybox},
 };
 
 const DAY_SECONDS: f64 = 24.0 * 60.0 * 60.0;
@@ -594,22 +594,24 @@ fn cycle_ui(ui: &mut Ui, cycle: &mut Cycle) {
     ui.small("Z / X 手动拨动时间");
 }
 
-fn clouds_ui(ui: &mut Ui, clouds: &mut Clouds) {
+fn clouds_ui(ui: &mut Ui, clouds: &mut CloudsUniform) {
     ui.horizontal(|ui| {
         ui.label("密度");
         ui.add(
             DragValue::new(&mut clouds.density)
                 .speed(0.01)
-                .range(1.0..=3.0),
+                .range(0.0..=1.0),
         );
         ui.label("步数");
         ui.add(DragValue::new(&mut clouds.step).speed(0.1).range(4..=64));
         ui.label("距离");
         ui.add(
-            DragValue::new(&mut clouds.length)
+            DragValue::new(&mut clouds.dist)
                 .speed(0.1e3)
                 .range(0.1e3..=100e3),
         );
+        ui.label("指数");
+        ui.add(DragValue::new(&mut clouds.index).speed(0.01).range(1..=4));
     });
     ui.horizontal(|ui| {
         ui.label("散射");
@@ -629,6 +631,27 @@ fn clouds_ui(ui: &mut Ui, clouds: &mut Clouds) {
             DragValue::new(&mut clouds.ior)
                 .speed(0.05)
                 .range(-1.0..=1.0),
+        );
+    });
+    ui.horizontal(|ui| {
+        ui.label("光照");
+        ui.label("步数");
+        ui.add(
+            DragValue::new(&mut clouds.light_step)
+                .speed(0.1)
+                .range(4..=64),
+        );
+        ui.label("距离");
+        ui.add(
+            DragValue::new(&mut clouds.light_dist)
+                .speed(0.1e3)
+                .range(0.1e3..=100e3),
+        );
+        ui.label("大气步数");
+        ui.add(
+            DragValue::new(&mut clouds.atmos_step)
+                .speed(0.1)
+                .range(1..=4),
         );
     });
 }

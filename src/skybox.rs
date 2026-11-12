@@ -16,7 +16,27 @@ pub struct CloudsUniform {
     pub scatter: f32,
     pub absorb: f32,
     pub ior: f32,
-    pub _pad: [u32; 2],
+    pub light_step: i32,
+    pub light_dist: f32,
+    pub atmos_step: i32,
+    pub index: f32,
+}
+
+impl Default for CloudsUniform {
+    fn default() -> Self {
+        Self {
+            density: 0.22,
+            step: 6,
+            dist: 8.6e3,
+            scatter: 1e-3,
+            absorb: 0.0,
+            ior: 0.35,
+            light_step: 4,
+            light_dist: 2e3,
+            atmos_step: 2,
+            index: 1.42,
+        }
+    }
 }
 
 impl Skybox {
