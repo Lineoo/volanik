@@ -22,45 +22,7 @@ pub struct SceneData {
     /// camera -> world
     pub world: Mat4,
     pub time: f32,
-    pub cloud_coverage: f32,
-    pub cloud_density: f32,
-    pub cloud_wind: f32,
-    pub cloud_quality: f32,
-    pub cloud_base: f32,
-    pub cloud_top: f32,
-    pub _pad: [u32; 1],
-}
-
-// Keep the Rust struct and the WGSL `Scene` struct in sync.
-const _: () = assert!(std::mem::size_of::<SceneData>() == 160);
-
-#[derive(Debug, Clone, Copy)]
-pub struct Clouds {
-    /// 0 = clear, 1 = overcast
-    pub coverage: f32,
-    /// density multiplier
-    pub density: f32,
-    /// horizontal wind speed, m/s
-    pub wind: f32,
-    /// raymarch quality, 0..1
-    pub quality: f32,
-    /// cloud base altitude, m
-    pub base: f32,
-    /// cloud top altitude, m
-    pub top: f32,
-}
-
-impl Default for Clouds {
-    fn default() -> Self {
-        Self {
-            coverage: 0.45,
-            density: 1.0,
-            wind: 12.0,
-            quality: 0.5,
-            base: 2000.0,
-            top: 6000.0,
-        }
-    }
+    pub _pad: [u32; 3],
 }
 
 pub struct Control {
@@ -74,7 +36,6 @@ pub struct Control {
     pub time: Duration,
     pub time_paused: bool,
     pub time_scale: f32,
-    pub clouds: Clouds,
 }
 
 impl Default for Control {
@@ -90,7 +51,6 @@ impl Default for Control {
             time: Duration::ZERO,
             time_paused: false,
             time_scale: 1.0,
-            clouds: Clouds::default(),
         }
     }
 }
@@ -105,13 +65,7 @@ impl Control {
             view: self.view(aspect),
             world: self.world(),
             time: self.time.as_secs_f32(),
-            cloud_coverage: self.clouds.coverage,
-            cloud_density: self.clouds.density,
-            cloud_wind: self.clouds.wind,
-            cloud_quality: self.clouds.quality,
-            cloud_base: self.clouds.base,
-            cloud_top: self.clouds.top,
-            _pad: [0; 1],
+            _pad: [0; 3],
         }
     }
 

@@ -10,6 +10,7 @@ pub struct Skybox {
 impl Skybox {
     pub fn new(options: RenderCreationOptions, camera: &BindGroupLayout) -> Skybox {
         let device = options.device;
+        let errors = device.push_error_scope(ErrorFilter::Validation);
 
         let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("skybox"),
@@ -17,10 +18,18 @@ impl Skybox {
             immediate_size: 0,
         });
 
-        let shader = device.create_shader_module(ShaderModuleDescriptor {
+        let mut shader = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("skybox"),
             source: ShaderSource::Wgsl(Shaders::Skybox.source()),
         });
+
+        if let Some(errors) = pollster::block_on(errors.pop()) {
+            log::warn!("{errors}");
+            shader = device.create_shader_module(ShaderModuleDescriptor {
+                label: Some("skybox"),
+                source: ShaderSource::Wgsl(Shaders::Fallback.source()),
+            });
+        }
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some("skybox"),
@@ -53,10 +62,11 @@ impl Skybox {
 
     pub fn reload(&mut self, options: RenderCreationOptions) {
         let device = options.device;
+        let errors = device.push_error_scope(ErrorFilter::Validation);
 
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("skybox"),
-            source: ShaderSource::Wgsl(Shaders::Skybox.source()),
+            source: ShaderSource::Wgsl(Shaders::Skybox.source_fs()),
         });
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
@@ -85,7 +95,11 @@ impl Skybox {
             cache: None,
         });
 
-        self.pipeline = pipeline;
+        if let Some(errors) = pollster::block_on(errors.pop()) {
+            log::warn!("{errors}");
+        } else {
+            self.pipeline = pipeline;
+        }
     }
 
     pub fn draw(&self, rpass: &mut RenderPass<'_>, camera: &Scene) {

@@ -1,4 +1,4 @@
-use std::{cell::Cell, path::PathBuf};
+use std::path::PathBuf;
 
 use wgpu::*;
 use winit::dpi::PhysicalSize;
@@ -6,7 +6,6 @@ use winit::dpi::PhysicalSize;
 use crate::overlay::Overlay;
 
 const MSAA_SAMPLE_COUNT: u32 = 1;
-const EXPORT_SETTLE_FRAMES: u32 = 3;
 
 pub struct Render {
     surface: Surface<'static>,
@@ -39,8 +38,6 @@ pub struct RenderUpdateOptions<'r> {
 struct Export {
     path: PathBuf,
     buffer: Buffer,
-    exported: Cell<bool>,
-    frames: Cell<u32>,
 }
 
 impl RenderUpdateOptions<'_> {
@@ -94,8 +91,6 @@ impl Render {
         let export = std::env::var_os("VOLANIK_EXPORT_PATH").map(|p| Export {
             path: PathBuf::from(p),
             buffer: device.create_buffer(&export_buffer(&config)),
-            exported: Cell::new(false),
-            frames: Cell::new(0),
         });
 
         Render {
@@ -206,17 +201,13 @@ impl Render {
 
         drop(rpass);
 
-        let export_now = self
-            .export
-            .as_ref()
-            .is_some_and(|export| export.should_export());
-        if let Some(export) = &self.export
-            && export_now
-        {
+        if let Some(export) = &self.export {
             export.export(&self.config, &surface.texture, &mut encoder);
             self.queue.submit([encoder.finish()]);
             self.queue.present(surface);
             export.save(&self.config, &self.device);
+            // TODO now only export once, we need remote
+            std::process::exit(0);
         } else {
             self.queue.submit([encoder.finish()]);
             self.queue.present(surface);
@@ -225,25 +216,12 @@ impl Render {
 }
 
 impl Export {
-    fn should_export(&self) -> bool {
-        if self.exported.get() {
-            return false;
-        }
-        let frames = self.frames.get() + 1;
-        self.frames.set(frames);
-        frames >= EXPORT_SETTLE_FRAMES
-    }
-
     fn export(
         &self,
         config: &SurfaceConfiguration,
         surface: &Texture,
         encoder: &mut CommandEncoder,
     ) {
-        if self.exported.get() {
-            return;
-        }
-
         let (bytes_per_row, rows_per_image) = export_extend(config);
         encoder.copy_texture_to_buffer(
             TexelCopyTextureInfo {
@@ -269,10 +247,6 @@ impl Export {
     }
 
     fn save(&self, config: &SurfaceConfiguration, device: &Device) {
-        if self.exported.get() {
-            return;
-        }
-
         let (row, col) = export_extend(config);
         let (row_png, col_png) = (config.width * 4, config.height);
         let (row, _col) = (row as usize, col as usize);
@@ -316,11 +290,6 @@ impl Export {
         writer.finish().unwrap();
 
         log::info!("exported frame to {}", self.path.display());
-        self.exported.set(true);
-
-        if std::env::var_os("VOLANIK_EXPORT_EXIT").is_some() {
-            std::process::exit(0);
-        }
     }
 }
 

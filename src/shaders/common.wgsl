@@ -2,13 +2,6 @@ struct Scene {
     view: mat4x4f,
     world: mat4x4f,
     time: f32,
-    cloud_coverage: f32,
-    cloud_density: f32,
-    cloud_wind: f32,
-    cloud_quality: f32,
-    cloud_base: f32,
-    cloud_top: f32,
-    pad: u32,
 }
 
 const E                 : f32 = 2.71828182845904523536028747135266250;
@@ -436,7 +429,8 @@ fn fbm4_pnoise4(p: vec4f) -> f32 {
 }
 
 // 4-step Fractal Brownian Motion with 2D Value Noise
-fn fbm4_vnoise2(p: vec2f) -> f32 {
+fn fbm4_vnoise2(p0: vec2f) -> f32 {
+    var p = p0;
     var amp = 0.5;
     var frq = 1.0;
     var sum = 0.0;
@@ -446,6 +440,7 @@ fn fbm4_vnoise2(p: vec2f) -> f32 {
         norm = norm + amp;
         amp  = amp * 0.5;
         frq  = frq * 2.0;
+        p = vec2f(p.x * 1.6 - p.y * 1.2, p.x * 1.2 + p.y * 1.6) + vec2f(13.7, 7.1);
     }
     return sum / norm;
 }

@@ -41,21 +41,6 @@ pub struct Input {
     pub shift: bool,
 }
 
-/// `VOLANIK_SIZE=1280x720` overrides the default window size, useful for
-/// low-quality export renders.
-fn window_size() -> PhysicalSize<u32> {
-    std::env::var("VOLANIK_SIZE")
-        .ok()
-        .and_then(|size| {
-            let (width, height) = size.split_once('x')?;
-            Some(PhysicalSize::new(
-                width.trim().parse::<u32>().ok()?.max(1),
-                height.trim().parse::<u32>().ok()?.max(1),
-            ))
-        })
-        .unwrap_or(PhysicalSize::new(1600, 900))
-}
-
 impl MainEventLoop {
     pub fn run(self) {
         let event_loop = EventLoop::new().unwrap();
@@ -67,7 +52,7 @@ impl ApplicationHandler for MainEventLoop {
     fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
         let attr = WindowAttributes::default()
             .with_transparent(true)
-            .with_surface_size(window_size())
+            .with_surface_size(PhysicalSize::new(1600, 900))
             .with_title("Volanik");
 
         let window = Arc::<dyn Window>::from(event_loop.create_window(attr).unwrap());
